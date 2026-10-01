@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "chestlogger_csv_tests",
+  "version": "1.0.0",
+  "name": "Chest Logger CSV Tests",
+  "environment": "*",
+  "entrypoints": { "fabric-gametest": ["com.chestlogger.ContainerGameTests"] },
+  "depends": { "chestlogger_csv": "*", "fabric-gametest-api-v1": "*" }
+}

@@ -1,0 +1,61 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version '1.17.14'
+}
+
+version = "${project.mod_version}+mc${project.minecraft_version}"
+group = 'com.chestlogger'
+base { archivesName = 'chestlogger-csv' }
+
+repositories { mavenCentral() }
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
+}
+
+java {
+    withSourcesJar()
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+}
+
+jar { from('LICENSE', 'NOTICE') }
+
+tasks.register('csvTest', JavaExec) {
+    group = 'verification'
+    description = 'Verifies CSV escaping, item deltas, and append/restart behavior.'
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.chestlogger.csv.CsvTests'
+}
+check.dependsOn csvTest
+// The verification runner above is dependency-free; Minecraft tests run separately.
+tasks.named('test') { enabled = false }
+
+sourceSets {
+    gametest {
+        java.srcDir 'src/test/java'
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += sourceSets.main.runtimeClasspath + sourceSets.main.output
+    }
+}
+loom {
+    mods {
+        chestlogger_csv { sourceSet sourceSets.main }
+        chestlogger_csv_tests { sourceSet sourceSets.gametest }
+    }
+    runs {
+        gametest {
+            server()
+            name 'Chest Logger Game Tests'
+            source sourceSets.gametest
+            vmArg '-Dfabric-api.gametest'
+            vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.get()}/gametest-results.xml"
+            runDir 'build/gametest'
+        }
+    }
+}

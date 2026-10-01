@@ -1,0 +1,7 @@
+Chest Logger CSV is an independent CSV replacement for ChestSee - Chestlogger.
+Behavior was informed by the MIT-licensed ChestSee 26.2 source archive by
+MafuuuX: https://modrinth.com/mod/chestsee-chestlogger/version/RmSO419a
+ChestSee was inspired by Aguga2201's MIT-licensed ChestLogs:
+https://github.com/Aguga2201/ChestLogs
+The logging and action-tracking implementation has been rewritten for CSV.
+This project is not an official ChestSee release.
