@@ -16,7 +16,9 @@ independent replacement based on the behavior of
 
 1. Use Minecraft **26.2**, Java **25 or newer**, Fabric Loader **0.19.3 or newer**,
    and Fabric API **0.154.2+26.2 or newer for Minecraft 26.2**.
-2. Put `chestlogger-csv-1.0.0+mc26.2.jar` in the server's `mods` folder.
+2. Download the latest JAR from
+   [GitHub Releases](https://github.com/evan6509/Chestlogger/releases/latest)
+   and put it in the server's `mods` folder.
    For singleplayer, put it in your Minecraft instance's `mods` folder.
 3. Remove the original ChestSee JAR when replacing it, then restart the server
    or open your singleplayer world.
@@ -96,9 +98,10 @@ select a specific chest. Sum `quantity` to count withdrawals, or sum
 Copy the CSV before editing it in Excel. Keep the active log's header and rows
 intact; saving spreadsheet changes over it while the server is running can
 disrupt logging. Logging failures appear in the server console. If an existing
-CSV has incompatible columns or an unfinished final row, the mod leaves it
-untouched and disables logging until the file is repaired and the server is
-restarted.
+CSV has incompatible columns, malformed quoting, or an unfinished final row,
+the mod leaves it untouched and disables logging until the file is repaired and
+the server is restarted. Existing records are checked once at startup; valid
+quoted fields containing line breaks remain supported.
 
 An illustrative file is provided at `examples/chestlog.csv`.
 
@@ -121,6 +124,37 @@ classes and the test mod are not included in the installable JAR.
 
 The tests use simulated server players. Manual testing with connected clients
 and a production modpack remains separate from these checks.
+
+## Automated releases
+
+After this workflow is merged, every successful push to `main` (including a PR
+merge) builds the mod, runs the CSV and Minecraft server tests, and publishes a
+[GitHub release](https://github.com/evan6509/Chestlogger/releases). Each release
+contains the installable JAR, `CHANGELOG.md`, and `SHA256SUMS`. The release page
+shows the same changelog, generated from commit messages and merged PRs since the
+previous release, plus installation requirements and the source commit.
+
+The first release starts at `v1.0.0`; each new release increments the patch
+version, such as `v1.0.1`. The JAR's embedded version and filename use this same
+version. Rerunning a commit reuses its release instead of creating a duplicate.
+Failed uploads remain drafts; publication waits until the uploaded files have
+been downloaded and verified against the build. Main pushes are queued so
+version selection and publication do not race. Retrying an older draft leaves a
+newer published stable version marked as **Latest**.
+
+PR and manual workflow runs build and test without publishing. Development work
+stays on `codex/development` and reaches `main` through a reviewed PR. No extra
+GitHub secret is required; the workflow uses the repository's `GITHUB_TOKEN`.
+Releases have the same private visibility as the repository.
+
+Local builds keep using `mod_version` from `gradle.properties`. To check a
+specific release version locally, use:
+
+```sh
+CHESTLOGGER_VERSION=1.0.1 ./gradlew build
+python3 -m unittest discover -s scripts -p 'test_*.py'
+CHESTLOGGER_VERSION=1.0.1 python3 scripts/verify_mod_jar.py
+```
 
 ## Credits
 
