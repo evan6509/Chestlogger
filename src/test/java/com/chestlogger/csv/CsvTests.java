@@ -49,6 +49,47 @@ public final class CsvTests {
         check(Files.readString(invalid).equals("old,schema\nkeep,this\n"), "Wrong schema left untouched");
         Files.writeString(invalid, CsvFile.HEADER + "\nunfinished");
         expectRejected(invalid);
+        Files.writeString(invalid, CsvFile.HEADER + "\n\"partial\n");
+        expectRejected(invalid);
+
+        String emptyColumns = ",".repeat(CsvFile.COLUMN_COUNT - 1);
+        String validRecord = "good" + emptyColumns + "\n";
+        for (String malformed : List.of(
+                "\"partial\r\n",
+                emptyColumns + "\"partial\n",
+                "short\n",
+                ",".repeat(CsvFile.COLUMN_COUNT) + "\n",
+                "bare\"quote" + emptyColumns + "\n",
+                "\"closed\"text" + emptyColumns + "\n",
+                "\"closed\"text" + emptyColumns + "\n" + validRecord,
+                "\n" + validRecord,
+                validRecord + "\r",
+                "good\rbad" + emptyColumns + "\n",
+                "\"closed\"" + emptyColumns)) {
+            Files.writeString(invalid, CsvFile.HEADER + "\n" + malformed);
+            expectRejected(invalid);
+        }
+
+        Path valid = folder.resolve("valid.csv");
+        Files.writeString(valid, CsvFile.HEADER + "\n");
+        try (CsvFile file = new CsvFile(valid)) { file.append(List.of(row("header only"))); }
+        // LF record endings and multiline quoted fields are valid, including the last column.
+        String multilineRecord = "\"line one\nline two\"" + ",".repeat(CsvFile.COLUMN_COUNT - 2)
+                + ",\"last \"\"quote\"\"\r\nline\"\n";
+        Files.writeString(valid, CsvFile.HEADER + "\n" + multilineRecord);
+        try (CsvFile file = new CsvFile(valid)) { file.append(List.of(row("after multiline"))); }
+        var multiline = parse(valid);
+        check(multiline.size() == 3, "Valid LF and multiline records accept appends");
+        check(multiline.get(1).size() == CsvFile.COLUMN_COUNT, "Multiline record has all columns");
+        check(multiline.get(1).get(20).equals("last \"quote\"\r\nline"), "Final quoted field preserved");
+
+        Path large = folder.resolve("large.csv");
+        // Escaped quotes straddle the validator's buffer boundary; the field spans several buffers.
+        String largeValue = "a".repeat(64 * 1024 - 2) + "\"\n💎" + "more, \"text\"\r\n".repeat(12000);
+        try (CsvFile file = new CsvFile(large)) { file.append(List.of(row(largeValue))); }
+        try (CsvFile file = new CsvFile(large)) { file.append(List.of(row("after large field"))); }
+        var largeRows = parse(large);
+        check(largeRows.size() == 3 && largeRows.get(1).get(0).equals(largeValue), "Large quoted field round-trip");
 
         Path concurrent = folder.resolve("concurrent.csv");
         try (CsvFile file = new CsvFile(concurrent)) {
@@ -68,7 +109,7 @@ public final class CsvTests {
             check(failures.isEmpty(), "Concurrent writes succeeded");
         }
         check(parse(concurrent).size() == 101, "Concurrent records are intact");
-        System.out.println("CSV checks passed: deltas, escaping, Unicode, formulas, flush, restart, schema, concurrent appends.");
+        System.out.println("CSV checks passed: deltas, escaping, Unicode, formulas, flush, restart, malformed records, large fields, concurrent appends.");
     }
 
     private static List<CsvCell> row(String first) {
@@ -79,9 +120,11 @@ public final class CsvTests {
     }
 
     private static void expectRejected(Path path) throws Exception {
+        byte[] original = Files.readAllBytes(path);
         try (CsvFile ignored = new CsvFile(path)) {
             throw new AssertionError("Malformed CSV must be rejected");
         } catch (IOException expected) { }
+        check(java.util.Arrays.equals(original, Files.readAllBytes(path)), "Rejected file left untouched");
     }
 
     public static void check(boolean condition, String message) {

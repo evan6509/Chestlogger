@@ -98,9 +98,10 @@ select a specific chest. Sum `quantity` to count withdrawals, or sum
 Copy the CSV before editing it in Excel. Keep the active log's header and rows
 intact; saving spreadsheet changes over it while the server is running can
 disrupt logging. Logging failures appear in the server console. If an existing
-CSV has incompatible columns or an unfinished final row, the mod leaves it
-untouched and disables logging until the file is repaired and the server is
-restarted.
+CSV has incompatible columns, malformed quoting, or an unfinished final row,
+the mod leaves it untouched and disables logging until the file is repaired and
+the server is restarted. Existing records are checked once at startup; valid
+quoted fields containing line breaks remain supported.
 
 An illustrative file is provided at `examples/chestlog.csv`.
 

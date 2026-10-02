@@ -1,5 +1,6 @@
 package com.chestlogger.csv;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.Closeable;
 import java.io.IOException;
@@ -26,6 +27,7 @@ public final class CsvFile implements Closeable {
                 if (!HEADER.equals(first)) {
                     throw new IOException("CSV header does not match; refusing to append incompatible columns: " + path);
                 }
+                validateRecords(reader, path);
             }
             // A truncated row is safer to leave for repair than silently corrupting the next row.
             try (var channel = Files.newByteChannel(path, StandardOpenOption.READ)) {
@@ -44,6 +46,65 @@ public final class CsvFile implements Closeable {
             writer.write("\uFEFF" + HEADER + "\r\n");
             writer.flush();
         }
+    }
+
+    private enum FieldState { START, UNQUOTED, QUOTED, CLOSED }
+
+    /** Validate once on startup, keeping memory bounded even for a large log. */
+    private static void validateRecords(BufferedReader reader, Path path) throws IOException {
+        FieldState state = FieldState.START;
+        int columns = 1;
+        long record = 2;
+        boolean recordStarted = false;
+        boolean expectLineFeed = false;
+        char[] buffer = new char[64 * 1024];
+        int length;
+        while ((length = reader.read(buffer)) != -1) {
+            for (int i = 0; i < length; i++) {
+                char c = buffer[i];
+                if (state == FieldState.QUOTED) {
+                    if (c == '"') state = FieldState.CLOSED;
+                    continue;
+                }
+                if (expectLineFeed) {
+                    if (c != '\n') throw malformed(path, record, "carriage return without a line feed");
+                    expectLineFeed = false;
+                } else if (c == '\r') {
+                    expectLineFeed = true;
+                    continue;
+                }
+                if (c == '\n') {
+                    if (columns != COLUMN_COUNT) {
+                        throw malformed(path, record, "expected " + COLUMN_COUNT + " columns, found " + columns);
+                    }
+                    state = FieldState.START;
+                    columns = 1;
+                    recordStarted = false;
+                    record++;
+                    continue;
+                }
+                recordStarted = true;
+                if (c == ',') {
+                    columns++;
+                    if (columns > COLUMN_COUNT) throw malformed(path, record, "too many columns");
+                    state = FieldState.START;
+                } else if (c == '"') {
+                    if (state == FieldState.UNQUOTED) throw malformed(path, record, "quote inside an unquoted field");
+                    // A quote after a closing quote is an escaped quote within the same field.
+                    state = FieldState.QUOTED;
+                } else {
+                    if (state == FieldState.CLOSED) throw malformed(path, record, "text after a closing quote");
+                    state = FieldState.UNQUOTED;
+                }
+            }
+        }
+        if (state == FieldState.QUOTED) throw malformed(path, record, "unfinished quoted field");
+        if (recordStarted || expectLineFeed) throw malformed(path, record, "unfinished final row");
+    }
+
+    private static IOException malformed(Path path, long record, String reason) {
+        return new IOException("CSV record " + record + " has " + reason
+                + "; repair it before restarting: " + path);
     }
 
     public synchronized void append(List<List<CsvCell>> rows) throws IOException {
