@@ -130,7 +130,7 @@ After this workflow is merged, every successful push to `main` (including a PR
 merge) builds the mod, runs the CSV and Minecraft server tests, and publishes a
 [GitHub release](https://github.com/evan6509/Chestlogger/releases). Each release
 contains the installable JAR, `CHANGELOG.md`, and `SHA256SUMS`. The release page
-shows the same changelog, generated from changes and merged PRs since the
+shows the same changelog, generated from commit messages and merged PRs since the
 previous release, plus installation requirements and the source commit.
 
 The first release starts at `v1.0.0`; each new release increments the patch

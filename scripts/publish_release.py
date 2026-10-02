@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -42,13 +43,25 @@ def previous_tag(releases, current_tag, commit):
     return None
 
 
-def write_changelog(path, version, jar, metadata, notes, repository, commit):
+def commit_notes(previous, commit, repository):
+    revision = f"refs/tags/{previous}..{commit}" if previous else commit
+    log = subprocess.check_output(["git", "log", "--reverse", "--format=%H%x00%s", revision], text=True)
+    bullets = []
+    for line in log.splitlines():
+        sha, subject = line.split("\0", 1)
+        subject = re.sub(r"([\\`*_{}\[\]<>])", r"\\\1", subject)
+        bullets.append(f"- {subject} ([{sha[:7]}](https://github.com/{repository}/commit/{sha}))")
+    return "\n".join(bullets)
+
+
+def write_changelog(path, version, jar, metadata, notes, repository, commit, commits):
     depends = metadata["depends"]
     requirements = ", ".join(f"{name} `{depends[key]}`" for key, name in (
         ("minecraft", "Minecraft"), ("fabricloader", "Fabric Loader"),
         ("fabric-api", "Fabric API"), ("java", "Java")))
     path.write_text(
         f"# Chest Logger CSV {version}\n\n{notes.strip()}\n\n"
+        f"## Commits\n\n{commits}\n\n"
         f"## Install\n\nDownload `{jar.name}` and put it in the server's `mods` folder.\n\n"
         f"Requirements: {requirements}.\n\n"
         f"Source: [{commit[:7]}](https://github.com/{repository}/commit/{commit}).\n",
@@ -92,7 +105,8 @@ def main():
         args += ["-f", f"previous_tag_name={previous}"]
     notes = json.loads(gh(*args))["body"]
     changelog = directory / "CHANGELOG.md"
-    write_changelog(changelog, version, jar, metadata, notes, repository, commit)
+    write_changelog(changelog, version, jar, metadata, notes, repository, commit,
+                    commit_notes(previous, commit, repository))
     checksums = directory / "SHA256SUMS"
     checksums.write_text("".join(
         f"{hashlib.sha256(asset.read_bytes()).hexdigest()}  {asset.name}\n"

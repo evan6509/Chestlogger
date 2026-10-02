@@ -133,6 +133,7 @@ class PublicationTests(unittest.TestCase):
                    GITHUB_REPOSITORY="example/chestlogger", GITHUB_SHA=COMMIT)
         with patch.dict(os.environ, env, clear=True), patch("sys.argv", ["publish_release.py", folder]), \
                 patch.object(publish_release, "verify", return_value=(jar, metadata)), \
+                patch.object(publish_release, "commit_notes", return_value="- Direct commit change"), \
                 patch.object(publish_release, "tag_commit", return_value=COMMIT if existing and not existing["draft"] else None), \
                 patch.object(publish_release, "gh", side_effect=fake_gh), contextlib.redirect_stdout(io.StringIO()):
             try:
@@ -151,6 +152,7 @@ class PublicationTests(unittest.TestCase):
             publish = next(i for i, call in enumerate(calls) if "--draft=false" in call)
             self.assertLess(download, publish)
             self.assertIn("Test change in #1", (Path(folder) / "CHANGELOG.md").read_text())
+            self.assertIn("Direct commit change", (Path(folder) / "CHANGELOG.md").read_text())
             self.assertIn("SHA256SUMS", " ".join(creation))
 
     def test_corrupt_download_is_not_published(self):
@@ -185,6 +187,17 @@ class PublicationTests(unittest.TestCase):
             publish_release.validate_target(release("v1.0.0", COMMIT), OTHER_COMMIT, COMMIT)
         with self.assertRaises(ValueError):
             publish_release.validate_target(release("v1.0.0", "main", draft=True), None, COMMIT)
+
+    def test_commit_notes_include_direct_changes_and_use_release_range(self):
+        output = COMMIT + "\0Fix [CSV] logging\n" + OTHER_COMMIT + "\0Handle commas\n"
+        with patch.object(publish_release.subprocess, "check_output", return_value=output) as log:
+            notes = publish_release.commit_notes("v1.0.0", COMMIT, "example/chestlogger")
+            self.assertIn("refs/tags/v1.0.0.." + COMMIT, log.call_args.args[0])
+            self.assertIn("Fix \\[CSV\\] logging", notes)
+            self.assertIn("Handle commas", notes)
+            self.assertIn("/commit/" + OTHER_COMMIT, notes)
+            publish_release.commit_notes(None, COMMIT, "example/chestlogger")
+            self.assertEqual(log.call_args.args[0][-1], COMMIT)
 
 
 if __name__ == "__main__":
