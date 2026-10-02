@@ -139,7 +139,8 @@ version, such as `v1.0.1`. The JAR's embedded version and filename use this same
 version. Rerunning a commit reuses its release instead of creating a duplicate.
 Failed uploads remain drafts; publication waits until the uploaded files have
 been downloaded and verified against the build. Main pushes are queued so
-version selection and publication do not race.
+version selection and publication do not race. Retrying an older draft leaves a
+newer published stable version marked as **Latest**.
 
 PR and manual workflow runs build and test without publishing. Development work
 stays on `codex/development` and reaches `main` through a reviewed PR. No extra

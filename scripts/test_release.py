@@ -103,11 +103,11 @@ class JarTests(unittest.TestCase):
 
 
 class PublicationTests(unittest.TestCase):
-    def run_publication(self, folder, existing=None, corrupt=False, api_failure=False):
+    def run_publication(self, folder, existing=None, corrupt=False, api_failure=False, releases=(), version="1.0.0"):
         directory = Path(folder)
-        jar = directory / "chestlogger-csv-1.0.0+mc26.2.jar"
+        jar = directory / f"chestlogger-csv-{version}+mc26.2.jar"
         jar.write_bytes(b"verified installable jar fixture")
-        metadata = dict(version="1.0.0+mc26.2", depends={"minecraft": "26.2", "fabricloader": ">=0.19.3",
+        metadata = dict(version=f"{version}+mc26.2", depends={"minecraft": "26.2", "fabricloader": ">=0.19.3",
                                                       "fabric-api": ">=0.154.2", "java": ">=25"})
         calls = []
 
@@ -116,7 +116,7 @@ class PublicationTests(unittest.TestCase):
             if args[0] == "api" and "releases?" in args[1]:
                 if api_failure:
                     raise subprocess.CalledProcessError(1, ["gh", *args])
-                return json.dumps([[existing] if existing else []])
+                return json.dumps([([existing] if existing else []) + list(releases)])
             if args[0] == "api" and "generate-notes" in args[3]:
                 return json.dumps(dict(body="## What's Changed\n- Test change in #1"))
             if args[:2] == ("release", "download"):
@@ -129,7 +129,7 @@ class PublicationTests(unittest.TestCase):
                 return json.dumps(dict(url="https://example.invalid/release"))
             return ""
 
-        env = dict(CHESTLOGGER_VERSION="1.0.0", RELEASE_TAG="v1.0.0",
+        env = dict(CHESTLOGGER_VERSION=version, RELEASE_TAG=f"v{version}",
                    GITHUB_REPOSITORY="example/chestlogger", GITHUB_SHA=COMMIT)
         with patch.dict(os.environ, env, clear=True), patch("sys.argv", ["publish_release.py", folder]), \
                 patch.object(publish_release, "verify", return_value=(jar, metadata)), \
@@ -151,6 +151,7 @@ class PublicationTests(unittest.TestCase):
             download = next(i for i, call in enumerate(calls) if call[:2] == ("release", "download"))
             publish = next(i for i, call in enumerate(calls) if "--draft=false" in call)
             self.assertLess(download, publish)
+            self.assertIn("--latest", calls[publish])
             self.assertIn("Test change in #1", (Path(folder) / "CHANGELOG.md").read_text())
             self.assertIn("Direct commit change", (Path(folder) / "CHANGELOG.md").read_text())
             self.assertIn("SHA256SUMS", " ".join(creation))
@@ -174,12 +175,37 @@ class PublicationTests(unittest.TestCase):
             self.assertTrue(any(call[:2] == ("release", "upload") for call in calls))
             self.assertTrue(any("--draft=false" in call for call in calls))
 
+    def test_older_draft_retry_does_not_replace_newer_latest_release(self):
+        existing = release("v1.0.0", COMMIT, draft=True)
+        newer = release("v1.0.1")
+        self.assertEqual(select_version([existing, newer], COMMIT, {}, "1.0.0"), "1.0.0")
+        with tempfile.TemporaryDirectory() as folder:
+            calls = self.run_publication(folder, existing=existing, releases=[newer])
+            publication = next(call for call in calls if "--draft=false" in call)
+            self.assertIn("--latest=false", publication)
+
+    def test_unpublished_and_prerelease_versions_do_not_block_latest(self):
+        releases = [release("v1.0.1", draft=True), release("v2.0.0", prerelease=True),
+                    release("v3.0.0-beta.1", prerelease=True), release("nightly")]
+        with tempfile.TemporaryDirectory() as folder:
+            calls = self.run_publication(folder, releases=releases)
+            publication = next(call for call in calls if "--draft=false" in call)
+            self.assertIn("--latest", publication)
+
+    def test_latest_uses_numeric_version_order(self):
+        for version, other_version, flag in [("1.0.9", "1.0.10", "--latest=false"),
+                                             ("1.0.10", "1.0.9", "--latest")]:
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as folder:
+                calls = self.run_publication(folder, releases=[release(f"v{other_version}")], version=version)
+                publication = next(call for call in calls if "--draft=false" in call)
+                self.assertIn(flag, publication)
+
     def test_published_rerun_does_not_modify_assets(self):
         existing = release("v1.0.0", COMMIT)
         existing["assets"] = [dict(name=name, state="uploaded") for name in
                               ["chestlogger-csv-1.0.0+mc26.2.jar", "CHANGELOG.md", "SHA256SUMS"]]
         with tempfile.TemporaryDirectory() as folder:
-            calls = self.run_publication(folder, existing=existing)
+            calls = self.run_publication(folder, existing=existing, releases=[release("v1.0.1")])
             self.assertFalse(any(call[0] == "release" for call in calls))
 
     def test_conflicting_tag_or_mutable_draft_target_is_rejected(self):

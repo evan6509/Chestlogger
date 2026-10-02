@@ -123,7 +123,13 @@ def main():
     with tempfile.TemporaryDirectory(prefix="chestlogger-release-") as downloaded:
         gh("release", "download", tag, "--repo", repository, "--dir", downloaded)
         verify_downloads(assets, downloaded)
-    gh("release", "edit", tag, "--repo", repository, "--draft=false", "--latest")
+    # Resuming an older draft must not replace a newer stable download.
+    current_version = parse_version(version)
+    newer_published = any(not release["draft"]
+                          and parse_version(release["tag_name"][1:]) > current_version
+                          for release in stable_releases(releases))
+    latest = "--latest=false" if newer_published else "--latest"
+    gh("release", "edit", tag, "--repo", repository, "--draft=false", latest)
     url = json.loads(gh("release", "view", tag, "--repo", repository, "--json", "url"))["url"]
     print(f"Published: {url}")
     if "GITHUB_STEP_SUMMARY" in os.environ:
