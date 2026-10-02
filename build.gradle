@@ -2,7 +2,11 @@ plugins {
     id 'net.fabricmc.fabric-loom' version '1.17.14'
 }
 
-version = "${project.mod_version}+mc${project.minecraft_version}"
+def releaseModVersion = providers.environmentVariable('CHESTLOGGER_VERSION').getOrElse(project.mod_version)
+if (!(releaseModVersion ==~ /(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)/)) {
+    throw new GradleException('Mod version must be a number such as 1.0.1')
+}
+version = "${releaseModVersion}+mc${project.minecraft_version}"
 group = 'com.chestlogger'
 base { archivesName = 'chestlogger-csv' }
 
