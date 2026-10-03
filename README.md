@@ -8,9 +8,7 @@ CSV file per world:
 ```
 
 All dimensions and containers append to this same file, including after server
-restarts. There are no per-chest text files or daily rotations. This is an
-independent replacement based on the behavior of
-[ChestSee - Chestlogger](https://modrinth.com/mod/chestsee-chestlogger).
+restarts. There are no per-chest text files or daily rotations.
 
 ## Install
 
@@ -20,13 +18,11 @@ independent replacement based on the behavior of
    [GitHub Releases](https://github.com/evan6509/Chestlogger/releases/latest)
    and put it in the server's `mods` folder.
    For singleplayer, put it in your Minecraft instance's `mods` folder.
-3. Remove the original ChestSee JAR when replacing it, then restart the server
-   or open your singleplayer world.
+3. Restart the server or open your singleplayer world.
 
 Players joining a dedicated server do not need this mod on their clients.
 Use the regular JAR, rather than the `-sources.jar`. No configuration is needed.
-Existing ChestSee `.txt` logs are left in place; the CSV begins recording new
-activity when this mod starts.
+The CSV begins recording new activity when this mod starts.
 
 ## What gets logged
 
@@ -158,6 +154,4 @@ CHESTLOGGER_VERSION=1.0.1 python3 scripts/verify_mod_jar.py
 
 ## Credits
 
-ChestSee 26.2 by MafuuuX supplied the reference behavior. It was inspired by
-[Aguga2201's ChestLogs](https://github.com/Aguga2201/ChestLogs). See `NOTICE` and
-`LICENSE` for attribution and the MIT license.
+See `NOTICE` and `LICENSE` for attribution and the MIT license.
