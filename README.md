@@ -18,7 +18,8 @@ restarts. There are no per-chest text files or daily rotations.
    [GitHub Releases](https://github.com/evan6509/Chestlogger/releases/latest)
    and put it in the server's `mods` folder.
    For singleplayer, put it in your Minecraft instance's `mods` folder.
-3. Restart the server or open your singleplayer world.
+3. Make sure no other container logger is installed to prevent overlapping logs,
+   then restart the server or open your singleplayer world.
 
 Players joining a dedicated server do not need this mod on their clients.
 Use the regular JAR, rather than the `-sources.jar`. No configuration is needed.
