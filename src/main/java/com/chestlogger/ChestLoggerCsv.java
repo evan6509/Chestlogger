@@ -67,6 +67,23 @@ public final class ChestLoggerCsv implements ModInitializer {
         event(player, Containers.inMenu(menu), "CLOSE", null);
     }
 
+    public static boolean isLogging() { return log != null; }
+
+    public static void hopperTransferred(RandomizableContainerBlockEntity source,
+                                         Map<RandomizableContainerBlockEntity, Integer> additions, ItemStack item) {
+        if (log == null) return;
+        ZonedDateTime time = ZonedDateTime.now();
+        String eventId = UUID.randomUUID().toString();
+        List<List<CsvCell>> rows = new ArrayList<>();
+        for (var entry : additions.entrySet()) {
+            var destination = entry.getKey();
+            int quantity = entry.getValue();
+            rows.add(row(null, source, eventId, time, "HOPPER_REMOVE", item, -quantity, destination.getBlockPos()));
+            rows.add(row(null, destination, eventId, time, "HOPPER_ADD", item, quantity, source.getBlockPos()));
+        }
+        write(rows);
+    }
+
     public static void changed(ServerPlayer player,
             Map<RandomizableContainerBlockEntity, Map<InventorySnapshot.ItemKey, Integer>> before) {
         if (log == null || before.isEmpty()) return;
@@ -127,7 +144,8 @@ public final class ChestLoggerCsv implements ModInitializer {
                 CsvCell.text(level.dimension().identifier().toString()),
                 CsvCell.text(BuiltInRegistries.BLOCK.getKey(container.getBlockState().getBlock()).toString()),
                 CsvCell.number(pos.getX()), CsvCell.number(pos.getY()), CsvCell.number(pos.getZ()),
-                CsvCell.text(player.getGameProfile().name()), CsvCell.text(player.getUUID().toString()),
+                CsvCell.text(player == null ? "" : player.getGameProfile().name()),
+                CsvCell.text(player == null ? "" : player.getUUID().toString()),
                 CsvCell.text(action),
                 CsvCell.text(item == null ? "" : BuiltInRegistries.ITEM.getKey(item.getItem()).toString()),
                 CsvCell.text(item == null ? "" : item.getHoverName().getString()),

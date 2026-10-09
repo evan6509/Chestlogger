@@ -6,7 +6,8 @@
     "CompoundContainerAccessor",
     "ContainerMenuMixin",
     "ServerPlayerMixin",
-    "BlockItemMixin"
+    "BlockItemMixin",
+    "HopperBlockEntityMixin"
   ],
   "injectors": { "defaultRequire": 1 }
 }
