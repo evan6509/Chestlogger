@@ -3,7 +3,7 @@
   "id": "chestlogger_csv",
   "version": "${version}",
   "name": "Chest Logger CSV",
-  "description": "Logs player container activity to one searchable CSV per world.",
+  "description": "Logs player container activity and automatic hopper transfers to one searchable CSV per world.",
   "license": "MIT",
   "environment": "*",
   "entrypoints": { "main": ["com.chestlogger.ChestLoggerCsv"] },

@@ -1,16 +1,14 @@
 # Chest Logger CSV
 
-A Fabric mod for **Minecraft 26.2** that records player container activity in one
-CSV file per world:
+A Fabric mod for **Minecraft 26.2** that records player container activity and
+automatic hopper transfers in one CSV file per world:
 
 ```text
 <world folder>/ChestLog/chestlog.csv
 ```
 
 All dimensions and containers append to this same file, including after server
-restarts. There are no per-chest text files or daily rotations. This is an
-independent replacement based on the behavior of
-[ChestSee - Chestlogger](https://modrinth.com/mod/chestsee-chestlogger).
+restarts. There are no per-chest text files or daily rotations.
 
 ## Install
 
@@ -20,19 +18,22 @@ independent replacement based on the behavior of
    [GitHub Releases](https://github.com/evan6509/Chestlogger/releases/latest)
    and put it in the server's `mods` folder.
    For singleplayer, put it in your Minecraft instance's `mods` folder.
-3. Remove the original ChestSee JAR when replacing it, then restart the server
-   or open your singleplayer world.
+3. Make sure no other container logger is installed to prevent overlapping logs,
+   then restart the server or open your singleplayer world.
 
 Players joining a dedicated server do not need this mod on their clients.
 Use the regular JAR, rather than the `-sources.jar`. No configuration is needed.
-Existing ChestSee `.txt` logs are left in place; the CSV begins recording new
-activity when this mod starts.
+The CSV begins recording new activity when this mod starts.
 
 ## What gets logged
 
 - `OPEN` and `CLOSE`: a player successfully opens or closes a container.
 - `ADD`: items enter a container because of a player inventory action.
 - `REMOVE`: items leave a container because of a player inventory action.
+- `HOPPER_REMOVE` and `HOPPER_ADD`: a successful automatic transfer between
+  supported block containers. The source removal and destination addition share
+  one `event_id`; both rows have blank player fields. Each row's
+  `related_x`, `related_y`, `related_z` identifies the other container.
 - `BREAK`: a player successfully breaks a container.
 - `HOPPER_PLACED_BELOW`: a player successfully places a hopper directly below
   a container; the hopper position appears in `related_x`, `related_y`, `related_z`.
@@ -47,9 +48,19 @@ components remain distinct.
 Chests, trapped chests, barrels, shulker boxes, hoppers, dispensers, and droppers
 are supported. Modded containers using Minecraft's
 `RandomizableContainerBlockEntity` and exposing it through their menu slots may
-also work. Ender chests, entity inventories, furnaces, explosions, commands, and
-automatic hopper transfers are outside this logger's player-action scope.
-Automation is not attributed to whichever player happens to have a chest open.
+also work. Hopper pulls and pushes between these block containers are logged,
+including chest-to-hopper, hopper-to-chest, and hopper-to-hopper transfers.
+Ender chests, entity inventories (including hopper minecarts), furnaces,
+loose-item pickup, explosions, commands, and other automatic transfers are
+outside this logger's scope. Automation is not attributed to whichever player
+happens to have a chest open. Full destinations, rejected insertions, and powered
+hoppers do not create transfer rows.
+
+For a top chest feeding a hopper that feeds a lower chest, each item produces
+two transfer events: top chest to hopper, then hopper to lower chest. Each event
+has two balanced rows. Vanilla hoppers normally transfer one item at a time, so
+a full stack moving through both hops produces 256 transfer rows. These are
+written immediately; automated systems can grow the CSV quickly.
 
 For double chests, each item change uses the coordinates of the physical half
 that changed. Item rows are not duplicated for both halves. An open/close action
@@ -60,22 +71,22 @@ records a removal from one half and an addition to the other.
 
 | Column | Meaning |
 | --- | --- |
-| `event_id` | Shared UUID for rows belonging to the same player action. |
+| `event_id` | Shared UUID for rows belonging to the same player action or hopper transfer. |
 | `timestamp` | ISO date and time with UTC offset, including fractional seconds. |
 | `date`, `time` | Separate date and clock time, easy to filter in Excel. |
 | `timezone` | Server computer's time zone, such as `America/Chicago`. |
 | `dimension` | Dimension ID, such as `minecraft:overworld`; custom IDs are retained. |
 | `container` | Block ID, such as `minecraft:chest` or `minecraft:barrel`. |
 | `x`, `y`, `z` | Separate numeric coordinates of the container. |
-| `player` | Player's account name. |
-| `player_uuid` | Stable player identity even if the name changes. |
-| `action` | `OPEN`, `CLOSE`, `ADD`, `REMOVE`, `BREAK`, or `HOPPER_PLACED_BELOW`. |
+| `player` | Player's account name; blank for automatic transfers. |
+| `player_uuid` | Stable player identity even if the name changes; blank for automatic transfers. |
+| `action` | `OPEN`, `CLOSE`, `ADD`, `REMOVE`, `HOPPER_ADD`, `HOPPER_REMOVE`, `BREAK`, or `HOPPER_PLACED_BELOW`. The `HOPPER_` item actions identify the transfer cause. |
 | `item_id` | Item ID, such as `minecraft:diamond`; blank for non-item events. |
 | `item_name` | Display name, including custom names. |
 | `quantity` | Positive number of items added or removed. |
 | `quantity_delta` | Positive for additions, negative for removals. |
 | `item_data` | Item JSON with count normalized to 1, preserving item components. |
-| `related_x`, `related_y`, `related_z` | Hopper coordinates for placement events; otherwise blank. |
+| `related_x`, `related_y`, `related_z` | Other container's coordinates for a hopper transfer; hopper coordinates for placement events; otherwise blank. |
 
 Timestamps use the **server computer's time zone**, not Minecraft's day/night
 clock. A UTC offset is always included so times remain unambiguous during
@@ -93,7 +104,14 @@ as the delimiter. Create a table to enable column filters.
 For example, filter `action` to `REMOVE`, `item_id` to `minecraft:diamond`, and
 `player` to the name you want. Filter `dimension`, `x`, `y`, and `z` together to
 select a specific chest. Sum `quantity` to count withdrawals, or sum
-`quantity_delta` to find the net inventory change over the selected period.
+`quantity_delta` to find the net recorded inventory change over the selected
+period. Include `HOPPER_ADD` and `HOPPER_REMOVE` when accounting for automation;
+filtering by a player excludes automated transfers. Inventory balances still
+require a known starting inventory and no changes outside the logging scope.
+
+To trace hopper movement, filter to `HOPPER_REMOVE` and `HOPPER_ADD`, then filter
+an `event_id` to see both ends of one transfer. The CSV columns have not changed,
+so existing valid log files continue accepting new rows after upgrading.
 
 Copy the CSV before editing it in Excel. Keep the active log's header and rows
 intact; saving spreadsheet changes over it while the server is running can
@@ -119,7 +137,9 @@ suite covering inventory deltas, escaping, Unicode, formula protection, flush,
 append after restart, schema validation, and concurrent writes. `runGametest`
 runs a disposable Minecraft test server to verify the actual logging hooks,
 including item clicks, custom item names, two simultaneous players, double chest
-coordinates, hopper placement, successful breaks, and canceled breaks. Test
+coordinates, hopper placement, a full stack moving through two hops with a menu
+open, blocked and powered hoppers, physical double-chest transfer endpoints,
+custom item transfer data, successful breaks, and canceled breaks. Test
 classes and the test mod are not included in the installable JAR.
 
 The tests use simulated server players. Manual testing with connected clients
@@ -158,6 +178,4 @@ CHESTLOGGER_VERSION=1.0.1 python3 scripts/verify_mod_jar.py
 
 ## Credits
 
-ChestSee 26.2 by MafuuuX supplied the reference behavior. It was inspired by
-[Aguga2201's ChestLogs](https://github.com/Aguga2201/ChestLogs). See `NOTICE` and
-`LICENSE` for attribution and the MIT license.
+See `NOTICE` and `LICENSE` for attribution and the MIT license.

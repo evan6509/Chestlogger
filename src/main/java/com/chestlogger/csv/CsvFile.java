@@ -11,7 +11,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.stream.Collectors;
 
-/** One append-only UTF-8 file, flushed after every player action. */
+/** One append-only UTF-8 file, flushed after every player action or hopper transfer. */
 public final class CsvFile implements Closeable {
     public static final String HEADER = "event_id,timestamp,date,time,timezone,dimension,container,x,y,z,player,player_uuid,action,item_id,item_name,quantity,quantity_delta,item_data,related_x,related_y,related_z";
     public static final int COLUMN_COUNT = HEADER.split(",").length;

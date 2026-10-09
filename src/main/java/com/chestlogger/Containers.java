@@ -20,6 +20,27 @@ public final class Containers {
         return List.copyOf(found);
     }
 
+    public static List<RandomizableContainerBlockEntity> inContainer(Container container) {
+        Set<RandomizableContainerBlockEntity> found = new LinkedHashSet<>();
+        collect(container, found, new LinkedHashSet<>());
+        return List.copyOf(found);
+    }
+
+    /** Resolve a combined inventory slot to the physical chest half that owns it. */
+    public static RandomizableContainerBlockEntity atSlot(Container container, int slot) {
+        if (container instanceof CompoundContainer combined) {
+            var accessor = (CompoundContainerAccessor) combined;
+            var first = accessor.chestlogger$getFirst();
+            return slot < first.getContainerSize() ? atSlot(first, slot)
+                    : atSlot(accessor.chestlogger$getSecond(), slot - first.getContainerSize());
+        }
+        if (container instanceof RandomizableContainerBlockEntity blockEntity
+                && blockEntity.getLevel() != null && !blockEntity.getLevel().isClientSide()) {
+            return blockEntity;
+        }
+        return null;
+    }
+
     private static void collect(Container container, Set<RandomizableContainerBlockEntity> found,
                                 Set<Container> visited) {
         if (!visited.add(container)) return;
