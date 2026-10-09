@@ -25,6 +25,12 @@ Players joining a dedicated server do not need this mod on their clients.
 Use the regular JAR, rather than the `-sources.jar`. No configuration is needed.
 The CSV begins recording new activity when this mod starts.
 
+## Command
+
+Run `/chestlogger info` to display the installed mod's name and version, such as
+`Chest Logger CSV version 1.0.0+mc26.2`. All players can use it without operator
+permissions. It also works in the server console as `chestlogger info`.
+
 ## What gets logged
 
 - `OPEN` and `CLOSE`: a player successfully opens or closes a container.
@@ -72,8 +78,8 @@ records a removal from one half and an addition to the other.
 | Column | Meaning |
 | --- | --- |
 | `event_id` | Shared UUID for rows belonging to the same player action or hopper transfer. |
-| `timestamp` | ISO date and time with UTC offset, including fractional seconds. |
-| `date`, `time` | Separate date and clock time, easy to filter in Excel. |
+| `timestamp` | ISO date and time with UTC offset, to whole seconds. |
+| `date`, `time` | Separate date and clock time (`HH:mm:ss`), easy to filter in Excel. |
 | `timezone` | Server computer's time zone, such as `America/Chicago`. |
 | `dimension` | Dimension ID, such as `minecraft:overworld`; custom IDs are retained. |
 | `container` | Block ID, such as `minecraft:chest` or `minecraft:barrel`. |
@@ -100,6 +106,11 @@ apostrophe; signed coordinates and quantities remain numeric.
 
 Open `chestlog.csv`, or choose **Data → From Text/CSV** and select UTF-8 and comma
 as the delimiter. Create a table to enable column filters.
+
+If Excel displays the `time` column as minutes, seconds, and fractions, select
+the column and use **Format Cells → Custom → `hh:mm:ss`** to show hours, minutes,
+and seconds. CSV files store values, not Excel display formats. New rows use
+whole seconds; existing rows retain their original precision.
 
 For example, filter `action` to `REMOVE`, `item_id` to `minecraft:diamond`, and
 `player` to the name you want. Filter `dimension`, `x`, `y`, and `z` together to

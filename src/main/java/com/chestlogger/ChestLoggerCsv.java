@@ -33,6 +33,7 @@ public final class ChestLoggerCsv implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        ChestLoggerCommands.register();
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             var path = server.getWorldPath(LevelResource.ROOT).resolve("ChestLog").resolve("chestlog.csv");
             try {
@@ -137,9 +138,9 @@ public final class ChestLoggerCsv implements ModInitializer {
         }
         return List.of(
                 CsvCell.text(eventId),
-                CsvCell.text(time.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)),
+                CsvCell.text(time.withNano(0).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)),
                 CsvCell.text(time.toLocalDate().toString()),
-                CsvCell.text(time.format(DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))),
+                CsvCell.text(time.format(DateTimeFormatter.ofPattern("HH:mm:ss"))),
                 CsvCell.text(time.getZone().getId()),
                 CsvCell.text(level.dimension().identifier().toString()),
                 CsvCell.text(BuiltInRegistries.BLOCK.getKey(container.getBlockState().getBlock()).toString()),
