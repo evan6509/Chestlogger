@@ -33,7 +33,6 @@ public final class ChestLoggerCsv implements ModInitializer {
 
     @Override
     public void onInitialize() {
-        java.util.Objects.requireNonNull(log, "CSV writer must be initialized before registering server callbacks");
         ServerLifecycleEvents.SERVER_STARTING.register(server -> {
             var path = server.getWorldPath(LevelResource.ROOT).resolve("ChestLog").resolve("chestlog.csv");
             try {
