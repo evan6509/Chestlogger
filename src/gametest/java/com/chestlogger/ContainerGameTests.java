@@ -7,6 +7,7 @@ import net.fabricmc.fabric.api.gametest.v1.GameTest;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
@@ -118,6 +119,61 @@ public final class ContainerGameTests {
     }
 
     @GameTest
+    public void storagePlacementsIdentifyPlayerAndPhysicalBlock(GameTestHelper helper) throws IOException {
+        var player = helper.makeMockServerPlayerInLevel();
+        var blocks = List.of(Blocks.CHEST, Blocks.TRAPPED_CHEST, Blocks.BARREL, Blocks.SHULKER_BOX,
+                Blocks.DYED_SHULKER_BOX.blue(), Blocks.HOPPER, Blocks.DISPENSER, Blocks.DROPPER);
+        for (int i = 0; i < blocks.size(); i++) {
+            var block = blocks.get(i);
+            BlockPos pos = new BlockPos(1 + (i % 4) * 2, 1, 1 + (i / 4) * 2);
+            placeOnFloor(helper, player, pos, (BlockItem) block.asItem());
+            var rows = at(records(helper, player), helper.absolutePos(pos));
+            helper.assertTrue(rows.size() == 1 && rows.getFirst().get("action").equals("PLACE"),
+                    "Exactly one placement for " + block);
+            var row = rows.getFirst();
+            helper.assertTrue(row.get("container").equals(BuiltInRegistries.BLOCK.getKey(block).toString()),
+                    "Placed block type recorded");
+            helper.assertTrue(row.get("item_id").isEmpty() && row.get("quantity").isEmpty()
+                            && row.get("quantity_delta").isEmpty() && row.get("related_x").isEmpty()
+                            && row.get("related_y").isEmpty() && row.get("related_z").isEmpty(),
+                    "Placement is not an item transfer");
+        }
+        helper.assertTrue(records(helper, player).size() == blocks.size(), "No extra placement rows");
+
+        BlockPos firstPos = new BlockPos(1, 1, 5);
+        BlockPos secondPos = firstPos.east();
+        placeOnFloor(helper, player, firstPos, (BlockItem) Items.CHEST);
+        placeOnFloor(helper, player, secondPos, (BlockItem) Items.CHEST);
+        helper.assertTrue(helper.getLevel().getBlockState(helper.absolutePos(firstPos)).getValue(ChestBlock.TYPE)
+                != ChestType.SINGLE, "Placed chests joined into a double chest");
+        var rows = records(helper, player);
+        helper.assertTrue(rows.size() == blocks.size() + 2
+                        && at(rows, helper.absolutePos(firstPos)).size() == 1
+                        && at(rows, helper.absolutePos(secondPos)).size() == 1,
+                "Joining a double chest logs only the newly placed half");
+        helper.succeed();
+    }
+
+    @GameTest
+    public void failedAndUnsupportedPlacementsAreNotLogged(GameTestHelper helper) throws IOException {
+        var player = helper.makeMockServerPlayerInLevel();
+        BlockPos pos = new BlockPos(2, 1, 2);
+        helper.setBlock(pos.below(), Blocks.STONE);
+        helper.setBlock(pos, Blocks.BEDROCK);
+        BlockPos support = helper.absolutePos(pos.below());
+        ItemStack hopper = new ItemStack(Items.HOPPER);
+        player.setItemInHand(InteractionHand.MAIN_HAND, hopper);
+        var hit = new BlockHitResult(Vec3.atCenterOf(support), Direction.UP, support, false);
+        var context = new BlockPlaceContext(player, InteractionHand.MAIN_HAND, hopper, hit);
+        helper.assertFalse(((BlockItem) Items.HOPPER).place(context).consumesAction(), "Occupied placement fails");
+        helper.assertTrue(helper.getLevel().getBlockState(helper.absolutePos(pos)).is(Blocks.BEDROCK),
+                "Failed placement left the block intact");
+        placeOnFloor(helper, player, pos.east(2), (BlockItem) Items.STONE);
+        helper.assertTrue(records(helper, player).isEmpty(), "Failed and non-storage placements have no rows");
+        helper.succeed();
+    }
+
+    @GameTest
     public void hopperPlacementAndSuccessfulBreak(GameTestHelper helper) throws IOException {
         BlockPos pos = new BlockPos(2, 2, 2);
         helper.setBlock(pos, Blocks.CHEST);
@@ -131,8 +187,14 @@ public final class ContainerGameTests {
         helper.assertTrue(result.consumesAction(), "Hopper placed successfully");
         helper.assertTrue(helper.getLevel().getBlockState(absolute.below()).is(Blocks.HOPPER), "Actual hopper placed");
         var rows = records(helper, player);
+        var placements = at(rows, absolute.below());
+        helper.assertTrue(placements.size() == 1 && placements.getFirst().get("action").equals("PLACE")
+                        && placements.getFirst().get("container").equals("minecraft:hopper"),
+                "Hopper placement records its own position and placer");
         helper.assertTrue(rows.stream().filter(r -> r.get("action").equals("HOPPER_PLACED_BELOW")).count() == 1,
                 "Single hopper event");
+        helper.assertTrue(rows.size() == 2 && rows.getFirst().get("event_id").equals(rows.getLast().get("event_id")),
+                "Placement and affected-container rows share one player action ID");
         helper.assertTrue(rows.getLast().get("related_y").equals(Integer.toString(absolute.getY() - 1)), "Hopper coordinates logged");
         helper.assertTrue(player.gameMode.destroyBlock(absolute), "Chest broken through player game mode");
         helper.assertTrue(records(helper, player).stream().filter(r -> r.get("action").equals("BREAK")).count() == 1,
@@ -190,6 +252,49 @@ public final class ContainerGameTests {
                                 && count(playerRows, "REMOVE", "minecraft:dirt") == 0,
                         "Only the actual deposit is attributed to the player with the menu open");
                 player.doCloseContainer();
+            } catch (IOException e) { throw new UncheckedIOException(e); }
+        });
+    }
+
+    @GameTest(maxTicks = 80)
+    public void hopperToShulkerCanBeTracedToPlacer(GameTestHelper helper) throws IOException {
+        int firstRow = allRecords(helper).size();
+        BlockPos chestPos = new BlockPos(2, 2, 2);
+        BlockPos hopperPos = chestPos.below();
+        BlockPos shulkerPos = hopperPos.east();
+        helper.setBlock(chestPos, Blocks.CHEST);
+        var placer = helper.makeMockServerPlayerInLevel();
+        placeOnFloor(helper, placer, shulkerPos, (BlockItem) Items.SHULKER_BOX);
+        BlockPos absoluteShulker = helper.absolutePos(shulkerPos);
+        ItemStack hopperItem = new ItemStack(Items.HOPPER);
+        placer.setItemInHand(InteractionHand.MAIN_HAND, hopperItem);
+        var hit = new BlockHitResult(Vec3.atCenterOf(absoluteShulker), Direction.WEST, absoluteShulker, false);
+        var context = new BlockPlaceContext(placer, InteractionHand.MAIN_HAND, hopperItem, hit);
+        helper.assertTrue(((BlockItem) Items.HOPPER).place(context).consumesAction(), "Player placed the transfer hopper");
+        helper.assertTrue(helper.getLevel().getBlockState(helper.absolutePos(hopperPos)).getValue(HopperBlock.FACING)
+                == Direction.EAST, "Hopper points into the shulker box");
+        var chest = helper.getBlockEntity(chestPos, RandomizableContainerBlockEntity.class);
+        var hopper = helper.getBlockEntity(hopperPos, HopperBlockEntity.class);
+        var shulker = helper.getBlockEntity(shulkerPos, RandomizableContainerBlockEntity.class);
+        chest.setItem(0, new ItemStack(Items.DIAMOND, 3));
+        helper.succeedWhen(() -> {
+            helper.assertTrue(chest.isEmpty() && hopper.isEmpty() && shulker.getItem(0).getCount() == 3,
+                    "Diamonds moved from the chest through the hopper into the shulker");
+            try {
+                var transfers = hopperRecords(helper, firstRow, chest.getBlockPos(), hopper.getBlockPos(), shulker.getBlockPos());
+                assertHopperPairs(helper, transfers);
+                helper.assertTrue(transfers.size() == 12
+                                && count(at(transfers, chest.getBlockPos()), "HOPPER_REMOVE", "minecraft:diamond") == 3
+                                && count(at(transfers, shulker.getBlockPos()), "HOPPER_ADD", "minecraft:diamond") == 3,
+                        "Both hops logged with actual quantities");
+                var playerRows = records(helper, placer);
+                for (var placed : List.of(hopper, shulker)) {
+                    var rows = at(playerRows, placed.getBlockPos());
+                    helper.assertTrue(rows.size() == 1 && rows.getFirst().get("action").equals("PLACE"),
+                            "Transfer endpoint links to the player's placement history");
+                }
+                helper.assertTrue(playerRows.size() == 3 && at(playerRows, chest.getBlockPos()).getFirst()
+                        .get("action").equals("HOPPER_PLACED_BELOW"), "Affected chest also links to the hopper placer");
             } catch (IOException e) { throw new UncheckedIOException(e); }
         });
     }
@@ -306,7 +411,19 @@ public final class ContainerGameTests {
         });
     }
 
-    private static List<Map<String, String>> at(List<Map<String, String>> rows, BlockPos pos) {
+    static void placeOnFloor(GameTestHelper helper, ServerPlayer player, BlockPos pos, BlockItem item) {
+        helper.setBlock(pos.below(), Blocks.STONE);
+        BlockPos support = helper.absolutePos(pos.below());
+        ItemStack stack = new ItemStack(item);
+        player.setItemInHand(InteractionHand.MAIN_HAND, stack);
+        var hit = new BlockHitResult(Vec3.atCenterOf(support), Direction.UP, support, false);
+        var context = new BlockPlaceContext(player, InteractionHand.MAIN_HAND, stack, hit);
+        helper.assertTrue(item.place(context).consumesAction(), "Block placed through player item use");
+        helper.assertTrue(helper.getLevel().getBlockState(helper.absolutePos(pos)).is(item.getBlock()),
+                "Actual block placed at the expected coordinates");
+    }
+
+    static List<Map<String, String>> at(List<Map<String, String>> rows, BlockPos pos) {
         return rows.stream().filter(r -> r.get("x").equals(Integer.toString(pos.getX()))
                 && r.get("y").equals(Integer.toString(pos.getY()))
                 && r.get("z").equals(Integer.toString(pos.getZ()))).toList();
@@ -347,12 +464,12 @@ public final class ContainerGameTests {
         }
     }
 
-    private static int count(List<Map<String, String>> rows, String action, String item) {
+    static int count(List<Map<String, String>> rows, String action, String item) {
         return rows.stream().filter(r -> r.get("action").equals(action) && r.get("item_id").equals(item))
                 .mapToInt(r -> Integer.parseInt(r.get("quantity"))).sum();
     }
 
-    private static List<Map<String, String>> records(GameTestHelper helper, ServerPlayer player) throws IOException {
+    static List<Map<String, String>> records(GameTestHelper helper, ServerPlayer player) throws IOException {
         var result = allRecords(helper).stream().filter(row -> row.get("player_uuid").equals(player.getUUID().toString())).toList();
         for (var row : result) {
             helper.assertTrue(row.get("player").equals(player.getGameProfile().name()), "Actual player name");
@@ -362,7 +479,7 @@ public final class ContainerGameTests {
         return result;
     }
 
-    private static List<Map<String, String>> allRecords(GameTestHelper helper) throws IOException {
+    static List<Map<String, String>> allRecords(GameTestHelper helper) throws IOException {
         var path = helper.getLevel().getServer().getWorldPath(LevelResource.ROOT).resolve("ChestLog/chestlog.csv");
         var csv = CsvTests.parse(path);
         List<Map<String, String>> result = new ArrayList<>();

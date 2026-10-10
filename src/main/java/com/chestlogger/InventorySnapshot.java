@@ -1,8 +1,8 @@
 package com.chestlogger;
 
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -26,18 +26,21 @@ public final class InventorySnapshot {
 
     private InventorySnapshot() { }
 
-    public static Map<ItemKey, Integer> contents(RandomizableContainerBlockEntity container) {
+    public static Map<ItemKey, Integer> contents(Iterable<ItemStack> container) {
         Map<ItemKey, Integer> result = new LinkedHashMap<>();
-        for (int i = 0; i < container.getContainerSize(); i++) {
-            ItemStack stack = container.getItem(i);
+        for (ItemStack stack : container) {
             if (!stack.isEmpty()) result.merge(new ItemKey(stack), stack.getCount(), Integer::sum);
         }
         return result;
     }
 
-    public static Map<RandomizableContainerBlockEntity, Map<ItemKey, Integer>> capture(AbstractContainerMenu menu) {
-        Map<RandomizableContainerBlockEntity, Map<ItemKey, Integer>> result = new LinkedHashMap<>();
-        for (var container : Containers.inMenu(menu)) result.put(container, contents(container));
+    public static Map<Storage, Map<ItemKey, Integer>> capture(AbstractContainerMenu menu, ServerPlayer player) {
+        Map<Storage, Map<ItemKey, Integer>> result = new LinkedHashMap<>();
+        for (var container : Containers.inMenu(menu, player)) {
+            StorageAudit.observe(container);
+            var contents = container.contents();
+            if (contents != null) result.put(container, contents);
+        }
         return result;
     }
 }

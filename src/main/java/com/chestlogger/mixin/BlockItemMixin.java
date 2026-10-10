@@ -14,6 +14,6 @@ public abstract class BlockItemMixin {
     @Inject(method = "place(Lnet/minecraft/world/item/context/BlockPlaceContext;)Lnet/minecraft/world/InteractionResult;",
             at = @At("RETURN"))
     private void chestlogger$placed(BlockPlaceContext context, CallbackInfoReturnable<InteractionResult> cir) {
-        if (cir.getReturnValue().consumesAction()) ChestLoggerCsv.hopperPlaced(context);
+        if (cir.getReturnValue().consumesAction()) ChestLoggerCsv.placed(context);
     }
 }

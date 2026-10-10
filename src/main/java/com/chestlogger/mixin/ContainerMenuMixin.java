@@ -19,11 +19,13 @@ public abstract class ContainerMenuMixin {
             original.call(slot, button, input, player);
             return;
         }
-        var before = InventorySnapshot.capture((AbstractContainerMenu) (Object) this);
-        try {
-            original.call(slot, button, input, player);
-        } finally {
-            ChestLoggerCsv.changed(serverPlayer, before);
+        var before = InventorySnapshot.capture((AbstractContainerMenu) (Object) this, serverPlayer);
+        try (var ignored = com.chestlogger.StorageAudit.suspend()) {
+            try {
+                original.call(slot, button, input, player);
+            } finally {
+                ChestLoggerCsv.changed(serverPlayer, before);
+            }
         }
     }
 }

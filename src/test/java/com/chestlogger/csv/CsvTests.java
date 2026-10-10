@@ -81,7 +81,26 @@ public final class CsvTests {
         var multiline = parse(valid);
         check(multiline.size() == 3, "Valid LF and multiline records accept appends");
         check(multiline.get(1).size() == CsvFile.COLUMN_COUNT, "Multiline record has all columns");
-        check(multiline.get(1).get(20).equals("last \"quote\"\r\nline"), "Final quoted field preserved");
+        check(multiline.get(1).get(CsvFile.COLUMN_COUNT - 1).equals("last \"quote\"\r\nline"), "Final quoted field preserved");
+
+        Path legacy = folder.resolve("legacy.csv");
+        String legacyRow = "\"old, \"\"quoted\"\"\r\n日本語\"" + ",".repeat(20) + "\r\n";
+        String legacyText = "\uFEFF" + CsvFile.LEGACY_HEADER + "\r\n" + legacyRow;
+        Files.writeString(legacy, legacyText);
+        try (CsvFile file = new CsvFile(legacy)) { file.append(List.of(row("after upgrade"))); }
+        var upgraded = parse(legacy);
+        check(upgraded.size() == 3 && upgraded.getFirst().equals(List.of(CsvFile.HEADER.split(","))), "Old schema upgrades once");
+        check(upgraded.get(1).getFirst().equals("old, \"quoted\"\r\n日本語"), "Upgrade preserves multiline fields");
+        check(upgraded.get(1).size() == CsvFile.COLUMN_COUNT && upgraded.get(1).subList(21, 24).stream().allMatch(String::isEmpty),
+                "Old rows receive blank new identity columns");
+        try (var backups = Files.list(folder)) {
+            var backup = backups.filter(p -> p.getFileName().toString().startsWith("legacy.csv.schema21-")).findFirst().orElseThrow();
+            check(Files.readString(backup).equals(legacyText), "Upgrade keeps an exact original backup");
+        }
+        Files.writeString(invalid, CsvFile.LEGACY_HEADER + "\n\"partial\n");
+        expectRejected(invalid);
+        Files.writeString(invalid, CsvFile.LEGACY_HEADER);
+        expectRejected(invalid);
 
         Path large = folder.resolve("large.csv");
         // Escaped quotes straddle the validator's buffer boundary; the field spans several buffers.

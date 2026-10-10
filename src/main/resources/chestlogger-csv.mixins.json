@@ -7,7 +7,27 @@
     "ContainerMenuMixin",
     "ServerPlayerMixin",
     "BlockItemMixin",
-    "HopperBlockEntityMixin"
+    "HopperBlockEntityMixin",
+    "HorseInventoryAccessor",
+    "NautilusInventoryAccessor",
+    "LecternInventoryAccessor",
+    "EnderChestInventoryAccessor",
+    "StorageBlockMixin",
+    "StorageChangeMixin",
+    "SimpleStorageChangeMixin",
+    "StorageInteractionMixin",
+    "StorageExplosionMixin",
+    "StorageEntityMixin",
+    "StorageVehicleMixin",
+    "StoragePacketMixin",
+    "StorageCommandMixin",
+    "StoragePickupMixin",
+    "StorageLivingMixin",
+    "StorageLootMixin",
+    "StorageMinecartPlacementMixin",
+    "StorageBoatPlacementMixin"
   ],
-  "injectors": { "defaultRequire": 1 }
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

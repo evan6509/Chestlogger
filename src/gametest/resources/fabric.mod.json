@@ -4,6 +4,6 @@
   "version": "1.0.0",
   "name": "Chest Logger CSV Tests",
   "environment": "*",
-  "entrypoints": { "fabric-gametest": ["com.chestlogger.ContainerGameTests"] },
+  "entrypoints": { "fabric-gametest": ["com.chestlogger.ContainerGameTests", "com.chestlogger.StorageCoverageGameTests"] },
   "depends": { "chestlogger_csv": "*", "fabric-gametest-api-v1": "*" }
 }
