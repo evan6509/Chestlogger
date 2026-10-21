@@ -47,8 +47,14 @@ public final class CsvFile implements Closeable {
                 StandardOpenOption.CREATE, StandardOpenOption.APPEND);
         if (fresh) {
             // Excel recognizes the encoding when opening the CSV directly.
-            writer.write("\uFEFF" + HEADER + "\r\n");
-            writer.flush();
+            try {
+                writer.write("\uFEFF" + HEADER + "\r\n");
+                writer.flush();
+            } catch (IOException failure) {
+                try { writer.close(); }
+                catch (IOException closeFailure) { failure.addSuppressed(closeFailure); }
+                throw failure;
+            }
         }
     }
 

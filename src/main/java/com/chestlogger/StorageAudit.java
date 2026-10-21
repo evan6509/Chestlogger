@@ -69,7 +69,16 @@ public final class StorageAudit {
         if (contents != null) last.put(storage, contents);
     }
     public static void observe(Storage storage) {
-        if (storage == null || suspended > 0 || !ChestLoggerCsv.isLogging()) return;
+        if (suspended > 0) return;
+        observeNow(storage);
+    }
+    /** Explicit baselines precede native extraction, even when its notifications are silenced. */
+    public static void beforeTransfer(Container... containers) {
+        if (!ChestLoggerCsv.isLogging()) return;
+        for (var container : containers) Containers.inContainer(container).forEach(StorageAudit::observeNow);
+    }
+    private static void observeNow(Storage storage) {
+        if (storage == null || !ChestLoggerCsv.isLogging()) return;
         storage = track(storage.owner instanceof Entity entity ? Storage.entity(entity) : storage);
         if (storage == null || destroyedOwners.contains(storage.owner)) return;
         var contents = storage.contents();
@@ -79,7 +88,7 @@ public final class StorageAudit {
             return;
         }
         ChestLoggerCsv.auditChanges(null, storage, last.get(storage), contents, "STORAGE_");
-        last.put(storage, contents);
+        if (ChestLoggerCsv.isLogging()) last.put(storage, contents);
     }
     public static void observe(Object owner) {
         if (owner instanceof BlockEntity entity) observe(Storage.block(entity));
@@ -133,6 +142,7 @@ public final class StorageAudit {
                 if (!stores.containsKey(entry.getKey().owner)) continue;
                 var after = entry.getKey().contents();
                 flush(entry.getKey(), entry.getValue(), after);
+                if (!ChestLoggerCsv.isLogging()) return;
                 if (after != null) last.put(entry.getKey(), after);
                 if (parent != null && after != null && parent.before.containsKey(entry.getKey())) parent.before.put(entry.getKey(), after);
             }
@@ -192,6 +202,7 @@ public final class StorageAudit {
         }
     }
     public static void lootGenerated(Container container) {
+        if (!ChestLoggerCsv.isLogging()) return;
         var storage = Containers.resolve(container);
         if (storage == null) return;
         var contents = storage.contents();

@@ -25,16 +25,32 @@ public abstract class HopperBlockEntityMixin {
                                                   HopperBlockEntity hopper, Operation<Boolean> original) {
         try (var ignored = StorageAudit.suspend()) { return original.call(level, pos, hopper); }
     }
+    @WrapOperation(method = "ejectItems", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/level/block/entity/HopperBlockEntity;getAttachedContainer(Lnet/minecraft/world/level/Level;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/entity/HopperBlockEntity;)Lnet/minecraft/world/Container;"))
+    private static Container chestlogger$pushBaselines(net.minecraft.world.level.Level level, net.minecraft.core.BlockPos pos,
+                                                     HopperBlockEntity hopper, Operation<Container> original) {
+        Container destination = original.call(level, pos, hopper);
+        if (destination != null) StorageAudit.beforeTransfer(hopper, destination);
+        return destination;
+    }
     @WrapMethod(method = "tryTakeInItemFromSlot")
     private static boolean chestlogger$pullAttempt(Hopper hopper, Container source, int slot, Direction direction,
                                                   Operation<Boolean> original) {
         try (var ignored = StorageAudit.suspend()) { return original.call(hopper, source, slot, direction); }
+    }
+    @WrapOperation(method = "tryTakeInItemFromSlot", at = @At(value = "INVOKE",
+            target = "Lnet/minecraft/world/Container;removeItem(II)Lnet/minecraft/world/item/ItemStack;"))
+    private static ItemStack chestlogger$pullBaselines(Container source, int slot, int amount,
+                                                     Operation<ItemStack> original, @Local(argsOnly = true) Hopper hopper) {
+        StorageAudit.beforeTransfer(source, hopper);
+        return original.call(source, slot, amount);
     }
     @WrapMethod(method = "addItem(Lnet/minecraft/world/Container;Lnet/minecraft/world/entity/item/ItemEntity;)Z")
     private static boolean chestlogger$looseItem(Container destination, ItemEntity entity, Operation<Boolean> original) {
         var source = Storage.item(entity);
         var target = Containers.resolve(destination);
         ItemStack item = entity.getItem().copy();
+        StorageAudit.beforeTransfer(destination);
         try (var ignored = StorageAudit.suspend()) {
             boolean result = original.call(destination, entity);
             int moved = item.getCount() - (entity.isRemoved() ? 0 : entity.getItem().getCount());

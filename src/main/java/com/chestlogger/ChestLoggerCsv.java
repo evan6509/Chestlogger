@@ -46,8 +46,7 @@ public final class ChestLoggerCsv implements ModInitializer {
     }
 
     private static void closeLog() {
-        if (log == null) return;
-        try { log.close(); }
+        try { if (log != null) log.close(); }
         catch (IOException e) { LOGGER.error("Cannot close chest CSV", e); }
         finally { log = null; StorageAudit.clear(); }
     }
