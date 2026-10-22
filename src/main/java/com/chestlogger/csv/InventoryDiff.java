@@ -11,6 +11,7 @@ public final class InventoryDiff {
     public record Change<T>(T item, int delta) { }
 
     public static <T> List<Change<T>> between(Map<T, Integer> before, Map<T, Integer> after) {
+        if (before == after) return List.of();
         var keys = new LinkedHashSet<>(before.keySet());
         keys.addAll(after.keySet());
         List<Change<T>> changes = new ArrayList<>();

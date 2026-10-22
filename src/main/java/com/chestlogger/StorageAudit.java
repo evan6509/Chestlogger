@@ -77,18 +77,19 @@ public final class StorageAudit {
         if (!ChestLoggerCsv.isLogging()) return;
         for (var container : containers) Containers.inContainer(container).forEach(StorageAudit::observeNow);
     }
-    private static void observeNow(Storage storage) {
-        if (storage == null || !ChestLoggerCsv.isLogging()) return;
+    private static Map<InventorySnapshot.ItemKey, Integer> observeNow(Storage storage) {
+        if (storage == null || !ChestLoggerCsv.isLogging()) return null;
         storage = track(storage.owner instanceof Entity entity ? Storage.entity(entity) : storage);
-        if (storage == null || destroyedOwners.contains(storage.owner)) return;
+        if (storage == null || destroyedOwners.contains(storage.owner)) return null;
         var contents = storage.contents();
-        if (contents == null) return; // Reading unopened loot inventories would change vanilla loot generation.
+        if (contents == null) return null; // Reading unopened loot inventories would change vanilla loot generation.
         if (active != null) {
             active.before.putIfAbsent(storage, last.getOrDefault(storage, contents));
-            return;
+            return contents;
         }
         ChestLoggerCsv.auditChanges(null, storage, last.get(storage), contents, "STORAGE_");
         if (ChestLoggerCsv.isLogging()) last.put(storage, contents);
+        return contents;
     }
     public static void observe(Object owner) {
         if (owner instanceof BlockEntity entity) observe(Storage.block(entity));
@@ -124,11 +125,13 @@ public final class StorageAudit {
         private Scope(ServerPlayer actor, String cause) { this.actor = actor; this.cause = cause; }
         public void prepare(Storage storage) {
             if (storage == null) return;
+            Map<InventorySnapshot.ItemKey, Integer> contents = null;
             var previous = active;
             active = parent;
-            try { observe(storage); } finally { active = previous; }
+            // Settling pending changes already reads the complete before state.
+            try { if (suspended == 0) contents = observeNow(storage); } finally { active = previous; }
             storage = track(storage);
-            var contents = storage.contents();
+            if (contents == null) contents = storage.contents();
             if (parent != null && contents != null && parent.before.containsKey(storage)) {
                 parent.flush(storage, parent.before.get(storage), contents);
                 parent.before.put(storage, contents);

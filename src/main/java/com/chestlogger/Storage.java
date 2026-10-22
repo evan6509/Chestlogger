@@ -34,6 +34,7 @@ public final class Storage {
     private final String type;
     public final String entityUuid;
     public final String ownerUuid;
+    private final InventorySnapshot.Cache snapshot = new InventorySnapshot.Cache();
 
     private Storage(Object owner, Container inventory, Supplier<Iterable<ItemStack>> items,
                     Supplier<Level> level, Supplier<BlockPos> position, String type, String entityUuid, String ownerUuid) {
@@ -97,7 +98,7 @@ public final class Storage {
                 || owner instanceof ContainerEntity vehicle && vehicle.getContainerLootTable() != null;
     }
     public java.util.Map<InventorySnapshot.ItemKey, Integer> contents() {
-        return lootPending() ? null : InventorySnapshot.contents(items.get());
+        return lootPending() ? null : snapshot.contents(items.get());
     }
 
     @Override public boolean equals(Object other) { return other instanceof Storage storage && owner == storage.owner; }

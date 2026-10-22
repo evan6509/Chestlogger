@@ -60,6 +60,18 @@ loom {
             vmArg '-Dfabric-api.gametest'
             vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.get()}/gametest-results.xml"
             runDir 'build/gametest'
+            if (providers.gradleProperty('gameTestFilter').isPresent()) {
+                vmArg "-Dfabric-api.gametest.filter=${providers.gradleProperty('gameTestFilter').get()}"
+            }
+        }
+        commandBenchmark {
+            server()
+            name 'Chest Logger Command Audit Benchmark'
+            source sourceSets.gametest
+            vmArgs '-Dfabric-api.gametest', '-Dfabric-api.gametest.filter=chestlogger_csv_tests:command_audit_benchmark_*',
+                    '-Dchestlogger.commandBenchmark=true', '-Xms1G', '-Xmx2G', '-XX:+UseG1GC'
+            vmArg "-Dchestlogger.benchmarkOutput=${file(providers.gradleProperty('benchmarkOutput').getOrElse('build/command-benchmark')).absolutePath}"
+            runDir 'build/command-benchmark-server'
         }
     }
 }

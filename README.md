@@ -89,6 +89,8 @@ farms can grow the CSV quickly.
 
 See [the storage coverage audit](docs/storage-coverage.md) for the implementation,
 verification, and remaining boundaries.
+See [command audit performance](docs/command-audit-performance.md) for the measured
+inventory/command envelope and the reproducible benchmark.
 
 ## CSV columns
 

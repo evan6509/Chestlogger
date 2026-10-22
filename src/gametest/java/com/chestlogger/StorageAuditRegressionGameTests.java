@@ -120,40 +120,6 @@ public final class StorageAuditRegressionGameTests {
 
 
     @GameTest
-    public void commandScanProbe(GameTestHelper helper) throws Exception {
-        if (!Boolean.getBoolean("chestlogger.commandScanProbe")) { helper.succeed(); return; }
-        var player = helper.makeMockServerPlayerInLevel();
-        var commands = helper.getLevel().getServer().getCommands();
-        try (var state = new AuditState()) {
-            StorageAudit.clear();
-            var chests = new ArrayList<CountingChest>();
-            for (int size : new int[]{0, 64, 256, 1024}) {
-                while (chests.size() < size) {
-                    var chest = new CountingChest(helper.absolutePos(new BlockPos(2, 1, 2)));
-                    for (int slot = 0; slot < chest.getContainerSize(); slot++) chest.setItem(slot, new ItemStack(Items.DIAMOND, 64));
-                    chest.setLevel(helper.getLevel());
-                    StorageAudit.acknowledge(Storage.block(chest));
-                    chests.add(chest);
-                }
-                for (int i = 0; i < 3; i++) commands.performPrefixedCommand(player.createCommandSourceStack(), "chestlogger info");
-                chests.forEach(chest -> chest.reads = 0);
-                long start = System.nanoTime();
-                for (int i = 0; i < 10; i++) commands.performPrefixedCommand(player.createCommandSourceStack(), "chestlogger info");
-                long elapsed = System.nanoTime() - start;
-                System.out.println("COMMAND_SCAN_PROBE inventories=" + size + " commands=10 reads="
-                        + chests.stream().mapToLong(chest -> chest.reads).sum() + " elapsed_ns=" + elapsed);
-            }
-        }
-        helper.succeed();
-    }
-
-    private static final class CountingChest extends net.minecraft.world.level.block.entity.ChestBlockEntity {
-        private long reads;
-        private CountingChest(BlockPos pos) { super(pos, Blocks.CHEST.defaultBlockState()); }
-        @Override public ItemStack getItem(int slot) { reads++; return super.getItem(slot); }
-    }
-
-    @GameTest
     public void disabledLootGenerationDoesNotRetainUnloadedStorage(GameTestHelper helper) throws Exception {
         BlockPos pos = new BlockPos(2, 1, 2);
         helper.setBlock(pos, Blocks.CHEST);
@@ -229,14 +195,14 @@ public final class StorageAuditRegressionGameTests {
     }
 
     /** Preserve the other GameTests' baselines while exercising static failure/shutdown state. */
-    private static final class AuditState implements AutoCloseable {
+    static final class AuditState implements AutoCloseable {
         private final Field log = ChestLoggerCsv.class.getDeclaredField("log");
         private final Object previousLog;
         private final Map<Map<Object, Object>, Map<Object, Object>> maps = new java.util.IdentityHashMap<>();
         private final Map<Collection<Object>, List<Object>> collections = new java.util.IdentityHashMap<>();
 
         @SuppressWarnings("unchecked")
-        private AuditState() throws ReflectiveOperationException {
+        AuditState() throws ReflectiveOperationException {
             log.setAccessible(true);
             previousLog = log.get(null);
             for (var field : StorageAudit.class.getDeclaredFields()) {
