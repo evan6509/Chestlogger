@@ -44,6 +44,13 @@ jobs:
     needs: version
     if: ${{ !cancelled() && (needs.version.result == 'success' || needs.version.result == 'skipped') }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        minecraft: ['26.2', '26.3']
+    env:
+      CHESTLOGGER_TARGET: ${{ matrix.minecraft }}
+      GRADLE_USER_HOME: ${{ github.workspace }}/.gradle/user-${{ matrix.minecraft }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -67,31 +74,64 @@ jobs:
       - name: Test release helpers
         run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
       - name: Build and test the mod
-        run: ./gradlew --no-daemon clean build runGametest
+        run: ./gradlew --project-cache-dir .gradle/project-${{ matrix.minecraft }} --no-daemon --max-workers=1 -Pminecraft_target=${{ matrix.minecraft }} clean build runGametest
       - name: Verify installable JAR
         id: jar
         run: python3 scripts/verify_mod_jar.py
       - name: Upload installable JAR
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: chestlogger-csv
+          name: chestlogger-csv-${{ matrix.minecraft }}
           path: ${{ steps.jar.outputs.jar }}
           if-no-files-found: error
           retention-days: 14
+      - name: Upload compiled continuity writers
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: continuity-${{ matrix.minecraft }}
+          path: |
+            build/${{ matrix.minecraft }}/classes/java/main/
+            build/${{ matrix.minecraft }}/classes/java/test/
+          if-no-files-found: error
+          retention-days: 7
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: test-reports
+          name: test-reports-${{ matrix.minecraft }}
           path: |
-            build/gametest-results.xml
-            build/gametest/logs/latest.log
-            build/reports/
+            build/${{ matrix.minecraft }}/gametest-results.xml
+            build/${{ matrix.minecraft }}/gametest/logs/latest.log
+            build/${{ matrix.minecraft }}/reports/
           if-no-files-found: ignore
           retention-days: 7
 
+  continuity:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: continuity-*
+          path: continuity
+      - name: Verify CSV continuity across independently compiled targets
+        run: |
+          for target in 26.2 26.3; do
+            mkdir -p "compiled/$target/classes/java"
+            cp -R "continuity/continuity-$target/"* "compiled/$target/classes/java/"
+          done
+          python3 scripts/verify_csv_continuity.py compiled/26.2 compiled/26.3
+
   release:
-    needs: [version, build]
+    needs: [version, build, continuity]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -108,9 +148,10 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: chestlogger-csv
+          pattern: chestlogger-csv-*
+          merge-multiple: true
           path: release
       - name: Verify downloaded JAR
-        run: python3 scripts/verify_mod_jar.py release
-      - name: Publish JAR and changelog
+        run: python3 scripts/verify_mod_jar.py --pair release
+      - name: Publish paired JARs and changelog
         run: python3 scripts/publish_release.py release

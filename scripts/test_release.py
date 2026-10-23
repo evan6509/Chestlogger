@@ -65,9 +65,15 @@ class VersionTests(unittest.TestCase):
 
 
 class JarTests(unittest.TestCase):
-    def fixture(self, folder, embedded="1.0.1+mc26.2", include_tests=False):
-        jar = Path(folder) / "chestlogger-csv-1.0.1+mc26.2.jar"
-        metadata = dict(id="chestlogger_csv", version=embedded, depends={"minecraft": "26.2"})
+    def setUp(self):
+        environment = patch.dict(os.environ, CHESTLOGGER_TARGET="26.2")
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    def fixture(self, folder, embedded="1.0.1+mc26.2", include_tests=False, target="26.2"):
+        from verify_mod_jar import TARGETS
+        jar = Path(folder) / f"chestlogger-csv-1.0.1+mc{target}.jar"
+        metadata = dict(id="chestlogger_csv", version=embedded, depends={"minecraft": target, "fabricloader": ">=0.19.3", "fabric-api": ">=" + TARGETS[target]["api_min"], "java": ">=25"})
         with ZipFile(jar, "w") as archive:
             archive.writestr("fabric.mod.json", json.dumps(metadata))
             archive.writestr("chestlogger-csv.mixins.json", json.dumps(dict(package="com.chestlogger.mixin", mixins=["Example"])))
@@ -92,6 +98,22 @@ class JarTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Test classes"):
                 verify(folder, "1.0.1")
 
+    def test_wrong_game_and_constraints_rejected(self):
+        for dependency, value in [("minecraft", "26.3"), ("fabric-api", ">=0.154.2+26.2"),
+                                  ("fabricloader", ">=0.1"), ("java", ">=21")]:
+            with self.subTest(dependency=dependency), tempfile.TemporaryDirectory() as folder:
+                jar = self.fixture(folder)
+                with ZipFile(jar) as archive:
+                    files = {name: archive.read(name) for name in archive.namelist()}
+                metadata = json.loads(files["fabric.mod.json"])
+                metadata["depends"][dependency] = value
+                files["fabric.mod.json"] = json.dumps(metadata).encode()
+                with ZipFile(jar, "w") as archive:
+                    for name, contents in files.items():
+                        archive.writestr(name, contents)
+                with self.assertRaises(ValueError):
+                    verify(folder, "1.0.1")
+
     def test_missing_or_multiple_installable_jars(self):
         with tempfile.TemporaryDirectory() as folder:
             with self.assertRaises(ValueError):
@@ -109,6 +131,10 @@ class PublicationTests(unittest.TestCase):
         jar.write_bytes(b"verified installable jar fixture")
         metadata = dict(version=f"{version}+mc26.2", depends={"minecraft": "26.2", "fabricloader": ">=0.19.3",
                                                       "fabric-api": ">=0.154.2", "java": ">=25"})
+        other_jar = directory / f"chestlogger-csv-{version}+mc26.3.jar"
+        other_jar.write_bytes(b"verified 26.3 jar fixture")
+        other_metadata = dict(version=f"{version}+mc26.3", depends={"minecraft": "26.3", "fabricloader": ">=0.19.3",
+                                                      "fabric-api": ">=0.164.0", "java": ">=25"})
         calls = []
 
         def fake_gh(*args):
@@ -121,10 +147,10 @@ class PublicationTests(unittest.TestCase):
                 return json.dumps(dict(body="## What's Changed\n- Test change in #1"))
             if args[:2] == ("release", "download"):
                 downloaded = Path(args[args.index("--dir") + 1])
-                for asset in [jar, directory / "CHANGELOG.md", directory / "SHA256SUMS"]:
+                for asset in [jar, other_jar, directory / "CHANGELOG.md", directory / "SHA256SUMS"]:
                     (downloaded / asset.name).write_bytes(asset.read_bytes())
                 if corrupt:
-                    (downloaded / jar.name).write_bytes(b"corrupted download")
+                    (downloaded / (other_jar.name if corrupt == "26.3" else jar.name)).write_bytes(b"corrupted download")
             if args[:2] == ("release", "view"):
                 return json.dumps(dict(url="https://example.invalid/release"))
             return ""
@@ -132,7 +158,7 @@ class PublicationTests(unittest.TestCase):
         env = dict(CHESTLOGGER_VERSION=version, RELEASE_TAG=f"v{version}",
                    GITHUB_REPOSITORY="example/chestlogger", GITHUB_SHA=COMMIT)
         with patch.dict(os.environ, env, clear=True), patch("sys.argv", ["publish_release.py", folder]), \
-                patch.object(publish_release, "verify", return_value=(jar, metadata)), \
+                patch.object(publish_release, "verify_pair", return_value=[(jar, metadata), (other_jar, other_metadata)], create=True), \
                 patch.object(publish_release, "commit_notes", return_value="- Direct commit change"), \
                 patch.object(publish_release, "tag_commit", return_value=COMMIT if existing and not existing["draft"] else None), \
                 patch.object(publish_release, "gh", side_effect=fake_gh), contextlib.redirect_stdout(io.StringIO()):
@@ -146,6 +172,9 @@ class PublicationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             calls = self.run_publication(folder)
             creation = next(call for call in calls if call[:2] == ("release", "create"))
+            self.assertIn(str(Path(folder) / "chestlogger-csv-1.0.0+mc26.3.jar"), creation)
+            self.assertIn("mc26.3.jar", (Path(folder) / "SHA256SUMS").read_text())
+            self.assertIn("0.164.0", (Path(folder) / "CHANGELOG.md").read_text())
             self.assertIn("--draft", creation)
             self.assertIn(COMMIT, creation)
             download = next(i for i, call in enumerate(calls) if call[:2] == ("release", "download"))
@@ -161,6 +190,23 @@ class PublicationTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "differs from the build"):
                 self.run_publication(folder, corrupt=True)
             self.assertFalse(any("--draft=false" in call for call in self.calls))
+
+    def test_corrupt_second_target_is_not_published(self):
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "differs from the build"):
+                self.run_publication(folder, corrupt="26.3")
+            self.assertFalse(any("--draft=false" in call for call in self.calls))
+
+    def test_missing_target_stops_before_any_github_call(self):
+        with tempfile.TemporaryDirectory() as folder:
+            JarTests().fixture(folder)
+            env = dict(CHESTLOGGER_VERSION="1.0.1", RELEASE_TAG="v1.0.1",
+                       GITHUB_REPOSITORY="example/chestlogger", GITHUB_SHA=COMMIT)
+            with patch.dict(os.environ, env), patch("sys.argv", ["publish_release.py", folder]), \
+                    patch.object(publish_release, "gh") as github:
+                with self.assertRaisesRegex(ValueError, "exact target pair"):
+                    publish_release.main()
+                github.assert_not_called()
 
     def test_api_failure_is_not_treated_as_missing_release(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -203,7 +249,7 @@ class PublicationTests(unittest.TestCase):
     def test_published_rerun_does_not_modify_assets(self):
         existing = release("v1.0.0", COMMIT)
         existing["assets"] = [dict(name=name, state="uploaded") for name in
-                              ["chestlogger-csv-1.0.0+mc26.2.jar", "CHANGELOG.md", "SHA256SUMS"]]
+                              ["chestlogger-csv-1.0.0+mc26.2.jar", "chestlogger-csv-1.0.0+mc26.3.jar", "CHANGELOG.md", "SHA256SUMS"]]
         with tempfile.TemporaryDirectory() as folder:
             calls = self.run_publication(folder, existing=existing, releases=[release("v1.0.1")])
             self.assertFalse(any(call[0] == "release" for call in calls))

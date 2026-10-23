@@ -11,6 +11,7 @@ import java.util.Map;
 public final class CsvTests {
     public static void main(String[] args) throws Exception {
         CsvInitializationTests.main(args);
+        LoaderVersionTests.main(args);
         check(CsvCell.number(-340).encoded().equals("-340"), "Negative coordinates remain numbers");
         for (String value : List.of("=1+1", "+cmd", "-text", "@SUM(A1)", "  =1+1", "\tformula")) {
             check(CsvCell.text(value).encoded().startsWith("'"), "Formula prefix is protected: " + value);

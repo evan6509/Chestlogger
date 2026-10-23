@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 from release_version import parse_version, stable_releases, tag_commit
-from verify_mod_jar import verify
+from verify_mod_jar import verify_pair
 
 
 def gh(*args):
@@ -54,17 +54,20 @@ def commit_notes(previous, commit, repository):
     return "\n".join(bullets)
 
 
-def write_changelog(path, version, jar, metadata, notes, repository, commit, commits):
-    depends = metadata["depends"]
-    requirements = ", ".join(f"{name} `{depends[key]}`" for key, name in (
-        ("minecraft", "Minecraft"), ("fabricloader", "Fabric Loader"),
-        ("fabric-api", "Fabric API"), ("java", "Java")))
+def write_changelog(path, version, builds, notes, repository, commit, commits):
+    installs = []
+    for jar, metadata in builds:
+        depends = metadata["depends"]
+        requirements = ", ".join(f"{name} `{depends[key]}`" for key, name in (
+            ("minecraft", "Minecraft"), ("fabricloader", "Fabric Loader"),
+            ("fabric-api", "Fabric API"), ("java", "Java")))
+        installs.append(f"- `{jar.name}`: {requirements}.")
     path.write_text(
         f"# Chest Logger CSV {version}\n\n{notes.strip()}\n\n"
         f"## Commits\n\n{commits}\n\n"
-        f"## Install\n\nDownload `{jar.name}` and put it in the server's `mods` folder.\n\n"
-        f"Requirements: {requirements}.\n\n"
-        f"Source: [{commit[:7]}](https://github.com/{repository}/commit/{commit}).\n",
+        "## Install\n\nChoose the JAR matching your Minecraft version and put it in the server's `mods` folder.\n\n"
+        + "\n".join(installs) + "\n\n"
+        + f"Source: [{commit[:7]}](https://github.com/{repository}/commit/{commit}).\n",
         encoding="utf-8")
 
 
@@ -82,7 +85,8 @@ def main():
         raise ValueError("Release tag does not match the selected mod version")
     repository = os.environ["GITHUB_REPOSITORY"]
     commit = os.environ["GITHUB_SHA"]
-    jar, metadata = verify(directory, version)
+    builds = verify_pair(directory, version)
+    jars = [jar for jar, _ in builds]
     pages = json.loads(gh("api", f"repos/{repository}/releases?per_page=100", "--paginate", "--slurp"))
     releases = [release for page in pages for release in page]
     matches = [release for release in releases if release["tag_name"] == tag]
@@ -91,7 +95,7 @@ def main():
     existing = matches[0] if matches else None
     validate_target(existing, tag_commit(tag), commit)
     if existing is not None and not existing["draft"]:
-        required = {jar.name, "CHANGELOG.md", "SHA256SUMS"}
+        required = {jar.name for jar in jars} | {"CHANGELOG.md", "SHA256SUMS"}
         uploaded = {asset["name"] for asset in existing["assets"] if asset["state"] == "uploaded"}
         if not required <= uploaded:
             raise ValueError("Published release is missing expected assets; leaving it unchanged")
@@ -105,14 +109,14 @@ def main():
         args += ["-f", f"previous_tag_name={previous}"]
     notes = json.loads(gh(*args))["body"]
     changelog = directory / "CHANGELOG.md"
-    write_changelog(changelog, version, jar, metadata, notes, repository, commit,
+    write_changelog(changelog, version, builds, notes, repository, commit,
                     commit_notes(previous, commit, repository))
     checksums = directory / "SHA256SUMS"
     checksums.write_text("".join(
         f"{hashlib.sha256(asset.read_bytes()).hexdigest()}  {asset.name}\n"
-        for asset in [jar, changelog]), encoding="utf-8")
-    assets = [jar, changelog, checksums]
-    title = f"Chest Logger CSV {version} (Minecraft {metadata['depends']['minecraft']})"
+        for asset in [*jars, changelog]), encoding="utf-8")
+    assets = [*jars, changelog, checksums]
+    title = f"Chest Logger CSV {version} (Minecraft 26.2 and 26.3)"
     if existing is None:
         gh("release", "create", tag, *(str(asset) for asset in assets), "--repo", repository,
            "--title", title, "--notes-file", str(changelog), "--target", commit, "--draft")
@@ -134,7 +138,7 @@ def main():
     print(f"Published: {url}")
     if "GITHUB_STEP_SUMMARY" in os.environ:
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
-            summary.write(f"Published [{tag}]({url}) with the installable JAR, changelog, and checksums.\n")
+            summary.write(f"Published [{tag}]({url}) with both installable JARs, changelog, and checksums.\n")
 
 
 if __name__ == "__main__":

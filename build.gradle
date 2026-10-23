@@ -2,24 +2,43 @@ plugins {
     id 'net.fabricmc.fabric-loom' version '1.17.14'
 }
 
+// One pinned tuple per target; direct dependency overrides can mix incompatible games.
+def targets = new groovy.json.JsonSlurper().parse(file('targets.json'))
+def target = providers.gradleProperty('minecraft_target').getOrElse('26.2')
+if (!targets.containsKey(target)) throw new GradleException("Unsupported Minecraft target: ${target}")
+['minecraft_version', 'loader_version', 'fabric_version'].each {
+    if (gradle.startParameter.projectProperties.containsKey(it)) {
+        throw new GradleException("Use minecraft_target instead of overriding ${it}")
+    }
+}
+def selected = targets[target]
+layout.buildDirectory = file("build/${target}")
+tasks.register('targetInfo') {
+    doLast { println "target=${target} loader=${selected.loader} fabric-api=${selected.fabric_api}" }
+}
+
 def releaseModVersion = providers.environmentVariable('CHESTLOGGER_VERSION').getOrElse(project.mod_version)
 if (!(releaseModVersion ==~ /(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)/)) {
     throw new GradleException('Mod version must be a number such as 1.0.1')
 }
-version = "${releaseModVersion}+mc${project.minecraft_version}"
+version = "${releaseModVersion}+mc${target}"
 group = 'com.chestlogger'
 base { archivesName = 'chestlogger-csv' }
 
 repositories { mavenCentral() }
 dependencies {
-    minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+    minecraft "com.mojang:minecraft:${target}"
+    implementation "net.fabricmc:fabric-loader:${selected.loader}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${selected.fabric_api}"
 }
 
 processResources {
     inputs.property 'version', project.version
-    filesMatching('fabric.mod.json') { expand version: project.version }
+    inputs.file 'targets.json'
+    inputs.properties minecraft: target, loader: selected.loader, api_min: selected.api_min
+    filesMatching('fabric.mod.json') {
+        expand version: project.version, minecraft: target, loader: selected.loader, api_min: selected.api_min
+    }
 }
 
 java {
@@ -59,7 +78,7 @@ loom {
             source sourceSets.gametest
             vmArg '-Dfabric-api.gametest'
             vmArg "-Dfabric-api.gametest.report-file=${layout.buildDirectory.get()}/gametest-results.xml"
-            runDir 'build/gametest'
+            runDir "build/${target}/gametest"
             if (providers.gradleProperty('gameTestFilter').isPresent()) {
                 vmArg "-Dfabric-api.gametest.filter=${providers.gradleProperty('gameTestFilter').get()}"
             }
@@ -71,7 +90,7 @@ loom {
             vmArgs '-Dfabric-api.gametest', '-Dfabric-api.gametest.filter=chestlogger_csv_tests:command_audit_benchmark_*',
                     '-Dchestlogger.commandBenchmark=true', '-Xms1G', '-Xmx2G', '-XX:+UseG1GC'
             vmArg "-Dchestlogger.benchmarkOutput=${file(providers.gradleProperty('benchmarkOutput').getOrElse('build/command-benchmark')).absolutePath}"
-            runDir 'build/command-benchmark-server'
+            runDir "build/${target}/command-benchmark-server"
         }
     }
 }
