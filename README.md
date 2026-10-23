@@ -1,6 +1,6 @@
 # Chest Logger CSV
 
-A Fabric mod for **Minecraft 26.2** that records player container placements,
+A Fabric mod with separate builds for **Minecraft 26.2 and 26.3** that records player container placements,
 inventory activity, destruction, and automatic inventory changes in one CSV file per world:
 
 ```text
@@ -12,9 +12,15 @@ restarts. There are no per-chest text files or daily rotations.
 
 ## Install
 
-1. Use Minecraft **26.2**, Java **25 or newer**, Fabric Loader **0.19.3 or newer**,
-   and Fabric API **0.154.2+26.2 or newer for Minecraft 26.2**.
-2. Download the latest JAR from
+1. Use Java **25 or newer**, Fabric Loader **0.19.3 or newer**, and the
+   Fabric API build for your Minecraft version:
+
+   | Minecraft | Minimum Fabric API | Installable JAR suffix |
+   | --- | --- | --- |
+   | 26.2 | 0.154.2+26.2 | `+mc26.2.jar` |
+   | 26.3 | 0.164.0+26.3 | `+mc26.3.jar` |
+
+2. Download the matching JAR from
    [GitHub Releases](https://github.com/evan6509/Chestlogger/releases/latest)
    and put it in the server's `mods` folder.
    For singleplayer, put it in your Minecraft instance's `mods` folder.
@@ -22,7 +28,7 @@ restarts. There are no per-chest text files or daily rotations.
    then restart the server or open your singleplayer world.
 
 Players joining a dedicated server do not need this mod on their clients.
-Use the regular JAR, rather than the `-sources.jar`. No configuration is needed.
+Install exactly one matching game-version JAR. Use the regular JAR, rather than the `-sources.jar`. No configuration is needed.
 The CSV begins recording new activity when this mod starts.
 
 ## Command
@@ -173,14 +179,27 @@ commands, and ground pickups.
 
 ## Build and verify
 
-With Java 25 installed:
+With Java 25 installed, the default target is 26.2. `targets.json` pins the
+Minecraft/Loader/API matrix; direct dependency overrides are rejected. Loom
+1.17.14 and Gradle 9.6.1 are shared by both targets.
+
+Run each target from a **separate checkout or copied source workspace**, with
+separate Gradle homes and project caches (Loom also stores project-local state).
+Run the following inside each workspace, replacing `26.2` with `26.3` for the
+second copy:
 
 ```sh
-./gradlew build
-./gradlew runGametest
+GRADLE_USER_HOME="$PWD/.gradle/user-26.2" ./gradlew --project-cache-dir .gradle/project-26.2 --no-daemon --max-workers=1 -Pminecraft_target=26.2 clean build runGametest
+CHESTLOGGER_TARGET=26.2 python3 scripts/verify_mod_jar.py build/26.2/libs
 ```
 
-The installable JAR is in `build/libs/`. `build` runs a standalone CSV verification
+Do not run the two Gradle builds concurrently. Installable artifacts are
+`build/26.2/libs/chestlogger-csv-<version>+mc26.2.jar` and
+`build/26.3/libs/chestlogger-csv-<version>+mc26.3.jar`. Each declares exactly its
+Minecraft version. The API minimum uses the numeric API version because Fabric
+Loader ignores the `+26.x` suffix during dependency comparison.
+
+`build` runs a standalone CSV verification
 suite covering inventory deltas, escaping, Unicode, formula protection, flush,
 append after restart, schema validation, and concurrent writes. `runGametest`
 runs a disposable Minecraft test server to verify player menu actions, component
@@ -196,12 +215,28 @@ not included in the installable JAR.
 The tests use simulated server players. Manual testing with connected clients
 and a production modpack remains separate from these checks.
 
+To verify shared CSV compatibility after compiling both isolated workspaces:
+
+```sh
+python3 scripts/verify_csv_continuity.py /path/to/26.2/build/26.2 /path/to/26.3/build/26.3
+```
+
+This runs separate JVMs in 26.2 → 26.3 → 26.2 order against one temporary CSV,
+checking unchanged historical bytes, a single schema/header/BOM, cross-dimension
+records, balanced event groups, and malformed-file rejection. It does not open
+Minecraft worlds or establish that world downgrades are safe. CI requires both
+builds and this continuity check before the release job can run. To verify the
+combined download folder, use `python3 scripts/verify_mod_jar.py --pair release`.
+See [dual-target validation](docs/dual-target-validation.md) for dependency evidence
+and the implementation verification record.
+
 ## Automated releases
 
 After this workflow is merged, every successful push to `main` (including a PR
-merge) builds the mod, runs the CSV and Minecraft server tests, and publishes a
+merge) builds both targets, runs their CSV and Minecraft server tests,
+verifies CSV continuity across versions, and publishes a
 [GitHub release](https://github.com/evan6509/Chestlogger/releases). Each release
-contains the installable JAR, `CHANGELOG.md`, and `SHA256SUMS`. The release page
+contains both installable JARs, `CHANGELOG.md`, and `SHA256SUMS`. The release page
 shows the same changelog, generated from commit messages and merged PRs since the
 previous release, plus installation requirements and the source commit.
 
@@ -222,7 +257,7 @@ Local builds keep using `mod_version` from `gradle.properties`. To check a
 specific release version locally, use:
 
 ```sh
-CHESTLOGGER_VERSION=1.0.1 ./gradlew build
+CHESTLOGGER_VERSION=1.0.1 ./gradlew --max-workers=1 -Pminecraft_target=26.2 build
 python3 -m unittest discover -s scripts -p 'test_*.py'
 CHESTLOGGER_VERSION=1.0.1 python3 scripts/verify_mod_jar.py
 ```
