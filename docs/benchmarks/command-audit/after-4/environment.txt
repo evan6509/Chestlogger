@@ -1,0 +1,50 @@
+java=25.0.4.1+1-LTS
+vm=OpenJDK 64-Bit Server VM
+os=Linux 7.0.0-38-generic amd64
+processors=6
+args=[-Dchestlogger.benchmarkOutput=/home/evan/codex-minecraft-repairs-20261021/Chestlogger/build/command-benchmark-after-4, -Dchestlogger.commandBenchmark=true, -Dfabric-api.gametest, -Dfabric-api.gametest.filter=chestlogger_csv_tests:command_audit_benchmark_*, -Dfabric.dli.config=/home/evan/codex-minecraft-repairs-20261021/Chestlogger/.gradle/loom-cache/launch.cfg, -Dfabric.dli.env=server, -Dfabric.dli.main=net.fabricmc.loader.impl.launch.knot.KnotServer, -XX:+UseG1GC, --sun-misc-unsafe-memory-access=allow, --enable-native-access=ALL-UNNAMED, -Xms1G, -Xmx2G, -Dfile.encoding=UTF-8, -Duser.country, -Duser.language=en, -Duser.variant]
+rounds=3 samples_per_round=200
+command=Commands.performCommand(preparsed chestlogger info, suppressed output)
+representative=7/27 slots; 4 ordinary + 3 rich; stress=27/27 rich with nested containers
+host=evan-desktop
+cpu=Intel Core i5-9400F; 6 cores; 2.90 GHz base, 4.10 GHz max
+distribution=Ubuntu 26.04.1 LTS; RAM=15 GiB
+production_base_revision=a49012d1879db331e174ac35dbe7bb32db32cd96
+benchmark_sha256=2e97baa5f8fd97f755cc1f69541a34c6ca1c315d0b97871e0e853a513471dde8
+5d44d4129ba3b89cd5c200c6be131c3d11b3b11dae180b6d16dd887a75c7e1ab  src/main/java/com/chestlogger/ChestLoggerCommands.java
+eb68924a985c83db123e55b45f26f2e0c3808e569e6c1e8e4ed38a82bd6724e2  src/main/java/com/chestlogger/ChestLoggerCsv.java
+adee68a64d939d4ea2c11aa4e6664a897c7344c29e283527b15dc20f6cf20215  src/main/java/com/chestlogger/Containers.java
+28458b99ac0277e92595f4939922301c7656d58a3a21ba5fae4338b49bbe0786  src/main/java/com/chestlogger/HopperTransfer.java
+0dcce69a550922e64e491313fd0fa068ba29c37ea3842683632c277b42554584  src/main/java/com/chestlogger/InventorySnapshot.java
+ded24fa95090d7dc523b244687ae5b91d01db3068e0fdb6d4a8a93b8f4646924  src/main/java/com/chestlogger/Storage.java
+c80171ab22de8f1aee21285e9026346b5f597ff18b48fd937d0bf44f312c58d6  src/main/java/com/chestlogger/StorageAudit.java
+ac20d1726e5f3935454dd70241a2ff9d66cb0f01521bcabb5155c3572cb848ea  src/main/java/com/chestlogger/csv/CsvCell.java
+be26933ec83b8da5fef12a8a8366bd6295669ab566f53b4ae8fb84647d2997ce  src/main/java/com/chestlogger/csv/CsvFile.java
+f3d3d8b982232e0bde8ac9dd6c4c026d005cadf096a39b66511c88ed784caf39  src/main/java/com/chestlogger/csv/InventoryDiff.java
+0a32aa2226ab4a0fc7656b7725d985d4308047e1ae9e369b8055aa38c77f3944  src/main/java/com/chestlogger/mixin/BlockItemMixin.java
+a77a22d59473cef16dae8a71c4701c185cd1065b727b57ecc294627ec2c023f0  src/main/java/com/chestlogger/mixin/CompoundContainerAccessor.java
+634f94a6e98b45bc1718b643a76ef7b9b69fcb4e4da8ca0861cbe6902650bf53  src/main/java/com/chestlogger/mixin/ContainerMenuMixin.java
+5085f0b7309200d432bbcc2b3f5fc8ef525d41fa7dd88ed3c2fde3fa29cd6d4a  src/main/java/com/chestlogger/mixin/EnderChestInventoryAccessor.java
+86f63ab8ccfe03cb33ad7c6333d6ae1e67b09d69654fd5cf2dea265552cda855  src/main/java/com/chestlogger/mixin/HopperBlockEntityMixin.java
+310cd8bcfff89be267f63281650f5538fb8af7691afd492a16af9580068ce40c  src/main/java/com/chestlogger/mixin/HorseInventoryAccessor.java
+d913e1f207978b765db3aa205149300a5cec9d552af85412703ef8d8b8b40901  src/main/java/com/chestlogger/mixin/ItemStackComponentsAccessor.java
+1487a75d996e29a53f748380cf2bf18139df5c98c20e5782faf82d33bea2f78d  src/main/java/com/chestlogger/mixin/LecternInventoryAccessor.java
+83d1d45175746609747e77582c6d75f4863a417b63f11e6159abecf2128aecfa  src/main/java/com/chestlogger/mixin/NautilusInventoryAccessor.java
+8126902ad0dc15dbdb87edff5ef57f5c56e1603272d3aa7d36217db01cc57672  src/main/java/com/chestlogger/mixin/PatchedComponentsAccessor.java
+40c7f1b896b9b2d2dfd1c1a9ea04790cd41d304e506544e1ccd0be360263e1c7  src/main/java/com/chestlogger/mixin/ServerPlayerMixin.java
+aad1f5d84b1f72cef3018180786545bcaa42c62ef229134ff270b149fd969077  src/main/java/com/chestlogger/mixin/SimpleStorageChangeMixin.java
+2ad48c404135289e91c091a7eb8d371423e1eb27b051af6957c9cb9b6f60346a  src/main/java/com/chestlogger/mixin/StorageBlockMixin.java
+038ed4dddc752a39a4da61948544853caeb78fb52e3c3e24a6ecce4efbd06503  src/main/java/com/chestlogger/mixin/StorageBoatPlacementMixin.java
+b49607a74358e24febb39e38f2dc8f89bd605199c0511e4184cbcdee690e4aa5  src/main/java/com/chestlogger/mixin/StorageChangeMixin.java
+eaf70566254ee537b8ca9c6b3cef18bc865f5f7cb6d3d75d764f4047168d017a  src/main/java/com/chestlogger/mixin/StorageCommandMixin.java
+b8d63c925564c92605dbec5a81987f3ea0d6dfe9d9da360db6f4529bfb8b9d57  src/main/java/com/chestlogger/mixin/StorageEntityMixin.java
+d7ad662cae38f580aec67c3e146a99109dfaed2dac4756bef8315055c64b8b45  src/main/java/com/chestlogger/mixin/StorageExplosionMixin.java
+b202561c53a36de51111b5f87279d19341a12234538730284ec63ebba938cea7  src/main/java/com/chestlogger/mixin/StorageInteractionMixin.java
+058ba55784e9bf5cf055baf818236be6434fffb21412b51f9a9774e2a0c64cd6  src/main/java/com/chestlogger/mixin/StorageLivingMixin.java
+e8d13aa386bd4379f3e62ad6df3b0008fade74ff6dc21ab695cdd39f7c4e100b  src/main/java/com/chestlogger/mixin/StorageLootMixin.java
+c54d82bb475f1f6a13f26f4868e4f05cc819c3b79c17f0a4028c191ad999047b  src/main/java/com/chestlogger/mixin/StorageMinecartPlacementMixin.java
+4042f2d4af2ebe29e4cdbfaa87301be7f5e58270108edc3ffd3777e29e221550  src/main/java/com/chestlogger/mixin/StoragePacketMixin.java
+e917d5e0fcc745358410482b1f6e3c38ac22d9c91372d16a685bc82fd5948ab9  src/main/java/com/chestlogger/mixin/StoragePickupMixin.java
+01310f453417699672400b0dd7dcc4c26311c6553e641da506f8ad9fbb4d773b  src/main/java/com/chestlogger/mixin/StorageVehicleMixin.java
+8b49fceaf91fc86531f9cbf43b3580be1cfee7e728e53bbf7fdefc0eb856e1bf  src/main/resources/chestlogger-csv.mixins.json
+b8e213f92f9b902eb3b3acc2f04651d555f08ae10dc59ca1baeb809dc6032311  src/main/resources/fabric.mod.json

@@ -1,0 +1,16 @@
+('control', 'empty', 0): n=600 p50=0.001 p95=0.001 p99=0.001 ms
+('command', 'representative', 100): n=600 p50=0.029 p95=0.032 p99=0.042 ms
+('tick', 'representative', 100): n=600 p50=0.013 p95=0.013 p99=0.014 ms
+('command', 'representative', 1000): n=600 p50=0.350 p95=0.375 p99=0.403 ms
+('tick', 'representative', 1000): n=600 p50=0.138 p95=0.156 p99=0.169 ms
+('sustained', 'representative', 1000): n=300 p50=1.807 p95=1.861 p99=1.889 ms
+('command', 'representative', 5000): n=600 p50=3.083 p95=3.593 p99=3.673 ms
+('tick', 'representative', 5000): n=600 p50=1.075 p95=1.138 p99=1.169 ms
+('command', 'stress', 100): n=600 p50=0.059 p95=0.064 p99=0.089 ms
+('tick', 'stress', 100): n=600 p50=0.029 p95=0.032 p99=0.045 ms
+('command', 'stress', 1000): n=600 p50=0.827 p95=0.889 p99=0.937 ms
+('tick', 'stress', 1000): n=600 p50=0.368 p95=0.404 p99=0.415 ms
+('command', 'stress', 5000): n=600 p50=7.059 p95=7.326 p99=8.338 ms
+('tick', 'stress', 5000): n=600 p50=3.258 p95=3.401 p99=3.538 ms
+10 commands/s: mean=17.613, worst second=18.255 ms of command service/s
+PASS: all required workloads and performance budgets (using gross command service time).

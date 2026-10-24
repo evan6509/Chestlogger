@@ -1,0 +1,17 @@
+('control', 'empty', 0): n=600 p50=0.001 p95=0.001 p99=0.001 ms
+('command', 'representative', 100): n=600 p50=0.032 p95=0.034 p99=0.038 ms
+('tick', 'representative', 100): n=600 p50=0.014 p95=0.014 p99=0.027 ms
+('command', 'representative', 1000): n=600 p50=0.476 p95=0.544 p99=0.629 ms
+('tick', 'representative', 1000): n=600 p50=0.191 p95=0.214 p99=0.224 ms
+('sustained', 'representative', 1000): n=300 p50=2.388 p95=2.458 p99=2.501 ms
+('command', 'representative', 5000): n=600 p50=3.741 p95=3.902 p99=3.967 ms
+('tick', 'representative', 5000): n=600 p50=1.596 p95=1.668 p99=1.711 ms
+('command', 'stress', 100): n=600 p50=0.089 p95=0.102 p99=0.118 ms
+('tick', 'stress', 100): n=600 p50=0.044 p95=0.047 p99=0.071 ms
+('command', 'stress', 1000): n=600 p50=1.757 p95=1.861 p99=1.928 ms
+('tick', 'stress', 1000): n=600 p50=0.737 p95=0.789 p99=0.823 ms
+('command', 'stress', 5000): n=600 p50=12.025 p95=12.334 p99=12.473 ms
+('tick', 'stress', 5000): n=600 p50=5.611 p95=5.738 p99=5.821 ms
+10 commands/s: mean=23.383, worst second=24.214 ms of command service/s
+FAIL: stress/5000: p99 exceeds 10 ms
+FAIL: paced representative/1000: p99 exceeds 2.5 ms
