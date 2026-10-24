@@ -12,6 +12,15 @@ import verify_mod_jar
 ROOT = Path(__file__).resolve().parents[1]
 
 
+class TargetPinTests(unittest.TestCase):
+    def test_api_refresh_preserves_minimum_and_26_2_tuple(self):
+        targets = json.loads((ROOT / 'targets.json').read_text())
+        self.assertEqual(targets['26.2'], dict(loader='0.19.3',
+                         fabric_api='0.154.2+26.2', api_min='0.154.2'))
+        self.assertEqual(targets['26.3']['api_min'], '0.164.0')
+        self.assertEqual(targets['26.3']['fabric_api'], '0.165.0+26.3')
+
+
 class TargetTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

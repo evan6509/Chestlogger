@@ -15,14 +15,17 @@ restarts. There are no per-chest text files or daily rotations.
 1. Use Java **25 or newer**, Fabric Loader **0.19.3 or newer**, and the
    Fabric API build for your Minecraft version:
 
-   | Minecraft | Minimum Fabric API | Installable JAR suffix |
-   | --- | --- | --- |
-   | 26.2 | 0.154.2+26.2 | `+mc26.2.jar` |
-   | 26.3 | 0.164.0+26.3 | `+mc26.3.jar` |
+   | Minecraft | Minimum Fabric API (numeric version) | Build pin | Installable JAR suffix |
+   | --- | --- | --- | --- |
+   | 26.2 | 0.154.2 | 0.154.2+26.2 | `+mc26.2.jar` |
+   | 26.3 (development) | 0.164.0 | 0.165.0+26.3 | `+mc26.3.jar` |
 
-2. Download the matching JAR from
-   [GitHub Releases](https://github.com/evan6509/Chestlogger/releases/latest)
-   and put it in the server's `mods` folder.
+2. The published [v1.0.1 release](https://github.com/evan6509/Chestlogger/releases/tag/v1.0.1)
+   contains only `chestlogger-csv-1.0.1+mc26.2.jar` (plus `CHANGELOG.md` and
+   `SHA256SUMS`). Minecraft 26.3 is not yet a release asset. For 26.3, build
+   locally with `-Pminecraft_target=26.3` as described below, or use the
+   `chestlogger-csv-26.3` artifact from a successful workflow run of this
+   development branch. Put the matching JAR in the server's `mods` folder.
    For singleplayer, put it in your Minecraft instance's `mods` folder.
 3. Make sure no other container logger is installed to prevent overlapping logs,
    then restart the server or open your singleplayer world.
@@ -199,6 +202,12 @@ Do not run the two Gradle builds concurrently. Installable artifacts are
 Minecraft version. The API minimum uses the numeric API version because Fabric
 Loader ignores the `+26.x` suffix during dependency comparison.
 
+The 26.3 build pins Fabric API `0.165.0+26.3` while retaining the backward-
+compatible numeric minimum `0.164.0`. The initial port was tested on 0.164;
+an independent clean rebuild on 2026-10-24 also passed with the refreshed 0.165
+pin. Both 26.2 and 26.3 passed their GameTests and package audits; details are
+in the dated follow-up in the validation record.
+
 `build` runs a standalone CSV verification
 suite covering inventory deltas, escaping, Unicode, formula protection, flush,
 append after restart, schema validation, and concurrent writes. `runGametest`
@@ -232,17 +241,22 @@ and the implementation verification record.
 
 ## Automated releases
 
+The existing published `v1.0.1` contains only the 26.2 JAR. The paired-release
+workflow on this development branch describes future releases; it does not
+change the assets or history of that release.
+
 After this workflow is merged, every successful push to `main` (including a PR
 merge) builds both targets, runs their CSV and Minecraft server tests,
 verifies CSV continuity across versions, and publishes a
-[GitHub release](https://github.com/evan6509/Chestlogger/releases). Each release
+[GitHub release](https://github.com/evan6509/Chestlogger/releases). Each future paired release
 contains both installable JARs, `CHANGELOG.md`, and `SHA256SUMS`. The release page
 shows the same changelog, generated from commit messages and merged PRs since the
 previous release, plus installation requirements and the source commit.
 
-The first release starts at `v1.0.0`; each new release increments the patch
-version, such as `v1.0.1`. The JAR's embedded version and filename use this same
-version. Rerunning a commit reuses its release instead of creating a duplicate.
+Release versioning starts at `v1.0.0`; each new release increments the patch
+version from the existing release history. Both future paired JARs use the same
+release version in their embedded version and filename, with their respective
+Minecraft suffixes. Rerunning a commit reuses its release instead of creating a duplicate.
 Failed uploads remain drafts; publication waits until the uploaded files have
 been downloaded and verified against the build. Main pushes are queued so
 version selection and publication do not race. Retrying an older draft leaves a

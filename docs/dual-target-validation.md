@@ -160,3 +160,79 @@ that Minecraft worlds can be downgraded. GitHub Actions itself was not run here;
 workflow YAML was parsed and the matrix/release gates checked locally. Gradle
 reports existing deprecations for Gradle 10; this task retains Gradle 9.6.1.
 No PR, merge, tag, or release is part of this implementation.
+
+## 2026-10-24 API pin and release wording follow-up
+
+Starting checkout verified as `evan6509/Chestlogger`, branch `codex/development`,
+clean HEAD `aab5bf09daf4901bcf66ad6df95bc01c0ee58510` at
+`/home/evan/.hermes/cache/scratch/mc-dual-version-implementation-20261023/chestlogger`.
+Only `targets.json`, `scripts/test_targets.py`, `README.md`, and this record
+changed. The 26.3 build pin is now `0.165.0+26.3`; its numeric API minimum
+remains `0.164.0`. The entire 26.2 tuple remains Loader `0.19.3`, API
+`0.154.2+26.2`, minimum `0.154.2`. No production logging code, CSV schema,
+release workflow, or previously verified artifacts were changed.
+
+Strict TDD evidence:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=scripts python3 -m unittest test_targets.TargetPinTests -v
+```
+
+Before changing the pin, the new test failed as expected (one test, one failure):
+`AssertionError: '0.164.0+26.3' != '0.165.0+26.3'`. The preceding assertions
+for the unchanged 26.2 tuple and 26.3 minimum passed. After changing only the
+26.3 build pin, the test passed as part of this 28-test Python run:
+
+```sh
+mkdir -p .gradle/api-refresh-python-tmp
+TMPDIR="$PWD/.gradle/api-refresh-python-tmp" PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=scripts python3 -m unittest test_targets.TargetPinTests test_targets.PairedJarTests test_release test_continuity test_workflow -v
+```
+
+All 28 passed. These include fixture JAR/pair verification and mocked release
+and continuity orchestration; they do not verify freshly built artifacts.
+The two Gradle-backed `TargetTests` were not run. `java -version` reports
+`java: command not found`, and a Python loopback socket creation/bind probe
+fails with `PermissionError: [Errno 1] Operation not permitted` in this sandbox.
+No Gradle build or disposable GameTest server was run in this pass.
+
+At the Codex handoff, parent verification remained pending. The subsequent
+independent verification below supersedes those pending items; the historical
+0.164.0+26.3 results above remain specific to that earlier pin.
+
+README now records that published `v1.0.1` has only the 26.2 JAR, alongside
+`CHANGELOG.md` and `SHA256SUMS`. The unreleased 26.3 build is available through
+local target selection; the inspected workflow also uploads the matching
+`chestlogger-csv-26.3` artifact after successful verification. This describes
+workflow behavior, not an assertion that such a run has completed. Future paired
+releases are distinguished from the existing release history. No commit, push,
+merge, release, deployment, live server/world access, or EULA change was made.
+
+## Independent verification — 2026-10-24
+
+After the Codex sandbox could not create local sockets, the parent independently
+ran the matrix on the desktop with Temurin `25.0.4.1+1`, sequential one-worker
+Gradle builds, and distinct user homes/project caches for each Minecraft target:
+
+```sh
+./gradlew --no-daemon --max-workers=1 --project-cache-dir .gradle/independent-project-26.2 -Pminecraft_target=26.2 clean build runGametest
+./gradlew --no-daemon --max-workers=1 --project-cache-dir .gradle/independent-project-26.3 -Pminecraft_target=26.3 clean build runGametest
+./gradlew --no-daemon --max-workers=1 --project-cache-dir .gradle/independent-project-26.2 -Pminecraft_target=26.2 clean build runGametest
+```
+
+All three builds succeeded. Each run reported **45 required GameTests passed**.
+The 26.3 build resolved `0.165.0+26.3`; the 26.2 build tuple remained unchanged.
+Per-target JAR verification passed for both versions, as did exact paired-JAR
+verification, the cross-process 26.2 → 26.3 → 26.2 CSV continuity check (six
+records, unchanged prefixes, one schema/BOM and balanced groups), and all
+**30 Python tests**. `git diff --check` passed. Both GameTest EULA files remain
+`eula=false`.
+
+| Target | Fresh artifact | Bytes | SHA-256 | Embedded dependency |
+|---|---|---:|---|---|
+| 26.2 | `chestlogger-csv-1.0.0+mc26.2.jar` | 70772 | `cfad4bc27235fe762d285e705e93dd2e337735a753f49ec716a8db4d6762c1cf` | API `>=0.154.2`, Loader `>=0.19.3`, Minecraft `26.2`, Java `>=25` |
+| 26.3 | `chestlogger-csv-1.0.0+mc26.3.jar` | 70772 | `ae9c014ee8afe7b487bec7a169ee948f99394a8ed0f0cda1dc9c91c1e755ba8c` | API `>=0.164.0`, Loader `>=0.19.3`, Minecraft `26.3`, Java `>=25` |
+
+The prior releases were not modified. The currently published v1.0.1 release
+still contains only the 26.2 JAR; the 26.3 candidate remains unreleased. No GitHub
+Actions run, release, PR, merge, deployment, live server/world access, or
+connected-client gameplay was performed in this verification.
